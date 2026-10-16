@@ -22,6 +22,8 @@ async function handler(request:Request){try{const url=new URL(request.url),path=
   const data=await json(request);
   if(path==='profile')return response(await career.setProfile(data));
   if(path==='settings')return response(await career.setSettings(data));
+  if(path==='source-inspection')return response(await career.inspectSource(data.url));
+  if(path==='research-plan')return response(career.researchPlan(data.domain));
   if(path==='queue')return response(await career.queue(data.packet||data,data.run_id||null));
   if(path==='leads')return response(await career.recordLead(data));
   if(path==='reserve')return response(await career.reserve(data.id));

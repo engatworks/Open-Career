@@ -59,9 +59,7 @@ next-env.d.ts
 *token*.json
 /qa/
 
-# Generated compiler state and local private configuration
 *.tsbuildinfo
 *.sqlite
 *.sqlite3
 *.db
-/candidate_profile.json

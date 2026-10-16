@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
-import { Career, hash, validatePacket, visibleText, verifyEvidence, sourceURL } from '../lib/career.mjs';
+import { Career, hash, validatePacket, visibleText, verifyEvidence, sourceURL, inspectSource } from '../lib/career.mjs';
+import { extractPublicSource } from '../lib/public-source.mjs';
 
 class D1 {
  constructor(){this.db=new DatabaseSync(':memory:');this.db.exec(fs.readFileSync('drizzle/0000_tearful_brood.sql','utf8').replaceAll('--> statement-breakpoint',''));}
@@ -28,8 +29,51 @@ test('source-backed candidate claims required and profile change held at deliver
 test('run cannot overlap and finish counts are based on database not report prose',async()=>{const {c}=await setup();const {run_id}=await c.startRun();await assert.rejects(c.startRun(),/already active/);await c.queue(await packet(c),run_id);const report=await c.finishRun(run_id,{discovered:1,researched:1,queued:15,sent:15,held:0,reasons:[]});assert.equal(report.queued,1);assert.equal(report.sent,0);assert.equal(report.status,'partial');});
 
 
-test('official careers invitation works without inventing a named person; generic inbox and third-party page fail',async()=>{const {c}=await setup();const p=await packet(c);Object.assign(p,{contact_type:'recruitment_team',contact_name:'Recruitment Team',contact_role:'Recruitment',email:'careers@example.com',email_source_url:'https://example.com/careers',contact_role_source:'https://example.com/careers',contact_role_quote:'Join our engineering team',contact_email_quote:'Send your CV to careers@example.com',body:p.body.replace('Dear Sara','Dear Recruitment Team')});c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>Join our engineering team</p><p>Send your CV to careers@example.com</p>',{headers:{'content-type':'text/html'}});assert.equal((await c.queue(p)).queued,true);const cv=await c.config('cv');assert.throws(()=>validatePacket({...p,contact_email_quote:'Sales contact: careers@example.com'},profile,cv),/invitation/);assert.throws(()=>validatePacket({...p,email_source_url:'https://unrelated.com/list'},profile,cv),/employer website/);assert.throws(()=>validatePacket({...p,contact_name:'Invented Manager',body:p.body.replace('Recruitment Team','Invented Manager')},profile,cv),/team/);});
+test('official careers invitation works without inventing a named person; generic inbox and third-party page fail',async()=>{const {c}=await setup();const p=await packet(c);Object.assign(p,{named_search:{queries:['site:example.com engineering manager'],sources:['https://example.com/team'],outcome:'No named relevant person with a published work email was found.'},contact_type:'recruitment_team',contact_name:'Recruitment Team',contact_role:'Recruitment',email:'careers@example.com',email_source_url:'https://example.com/careers',contact_role_source:'https://example.com/careers',contact_role_quote:'Join our engineering team',contact_email_quote:'Send your CV to careers@example.com',body:p.body.replace('Dear Sara','Dear Recruitment Team')});c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>Join our engineering team</p><p>Send your CV to careers@example.com</p>',{headers:{'content-type':'text/html'}});assert.equal((await c.queue(p)).queued,true);const cv=await c.config('cv');assert.throws(()=>validatePacket({...p,contact_email_quote:'Sales contact: careers@example.com'},profile,cv),/invitation/);assert.throws(()=>validatePacket({...p,email_source_url:'https://unrelated.com/list'},profile,cv),/employer website/);assert.throws(()=>validatePacket({...p,contact_name:'Invented Manager',body:p.body.replace('Recruitment Team','Invented Manager')},profile,cv),/team/);});
 test('delivery requires background proof for the current attachment, not a successful draft',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c));await c.saveConfig('verification',{gmail_attachment:true,background_send:false});assert.equal((await c.status()).delivery_configured,false);await assert.rejects(c.reserve(q.id),/Background delivery verification/);assert.equal(await c.quota(),0);});
 test('pausing while sources are being checked prevents the atomic reservation',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c));const original=c.fetcher;c.fetcher=async(...args)=>{await c.setSettings({live_send_enabled:false});return original(...args);};await assert.rejects(c.reserve(q.id),/blocked delivery/);assert.equal(await c.quota(),0);});
 test('actual decline evidence suppresses recipient without erasing send history or quota',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);await c.receipt({reservation_token:r.reservation_token,message_id:'1000000000000001'});const feedback={id:q.id,kind:'decline',message_id:'2000000000000002',received_at:new Date().toISOString(),summary:'Recipient asked for no further contact.'};await c.feedback(feedback);assert.equal((await c.feedback(feedback)).already_recorded,true);assert.equal((await c.list())[0].status,'sent');assert.equal(await c.quota(),1);assert.ok(await c.stmt('SELECT email FROM suppression WHERE email=?','sara.ahmed@example.com').first());});
 test('cancelled queue is not counted as completed work and closed run cannot heartbeat',async()=>{const {c}=await setup();const {run_id}=await c.startRun();await c.heartbeat(run_id);const q=await c.queue(await packet(c),run_id);await c.cancel(q.id);const r=await c.finishRun(run_id,{discovered:1,researched:1,queued:15,sent:15,held:1,reasons:[]});assert.equal(r.queued,0);await assert.rejects(c.heartbeat(run_id),/no longer active/);assert.ok((await c.context()).agent_guide.api['POST /api/queue']);});
+
+test('inline mail links preserve punctuation and mailto-only targets stay with their own person',()=>{
+ const markup='<p>Send your CV to <a href="mailto:careers@example.com">careers@example.com</a>.</p><div><h3>Sara Ahmed</h3><p>Engineering Manager</p><a href="mailto:sara%2Eahmed@example.com?subject=Hello">Email Sara</a></div><footer><a href="mailto:other@example.com">Other team</a></footer>';
+ const r=extractPublicSource(markup,'https://example.com/team');
+ assert.ok(r.text.includes('Send your CV to careers@example.com.'));
+ assert.ok(r.text.includes('Sara Ahmed Engineering Manager Email Sara (sara.ahmed@example.com)'));
+ assert.ok(!r.text.includes('Sara Ahmed Engineering Manager Email Sara (other@example.com)'));
+ assert.ok(r.contacts.find(c=>c.email==='sara.ahmed@example.com').contexts.some(c=>c.includes('Sara Ahmed')));
+ assert.equal(r.contacts[0].identity_verified,false);
+});
+
+test('hidden/attribute-only addresses and scripts cannot supply public identity evidence',()=>{
+ const r=extractPublicSource('<div hidden><a href="mailto:hidden@example.com">Hidden</a></div><p aria-hidden="true">secret@example.com</p><template>template@example.com</template><span style="display:none">private@example.com</span><p title="attr@example.com">Public</p><script>script@example.com</script>');
+ assert.equal(r.text,'Public');assert.deepEqual(r.contacts,[]);
+});
+
+test('source inspection respects robots and exposes publication without claiming identity',async()=>{
+ const r=await inspectSource('https://example.com/team',fetcher);assert.ok(r.contacts.some(x=>x.email==='sara.ahmed@example.com'));assert.match(r.source_sha256,/^[a-f0-9]{64}$/);assert.equal(r.contacts[0].identity_verified,false);
+ await assert.rejects(inspectSource('https://example.com/team',async()=>new Response('User-agent: *\nDisallow: /')),/robots/);
+ await assert.rejects(inspectSource('https://example.com/team',async u=>new Response(String(u).endsWith('robots.txt')?'User-agent: *\nAllow: /':'PDF',{headers:{'content-type':'application/pdf'}})),/expected public HTML/);
+});
+
+test('speculative outreach needs no vacancy; advertised roles and recruitment fallbacks need evidence',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ assert.equal(validatePacket(p,profile,cv).intent,'speculative_referral');
+ assert.throws(()=>validatePacket({...p,intent:'advertised_role'},profile,cv),/advertised role/);
+ assert.throws(()=>validatePacket({...p,contact_type:'recruitment_team'},profile,cv),/named people first/);
+ await assert.rejects(verifyEvidence({...p,intent:'advertised_role',vacancy:{source_url:'https://example.com/jobs',source_quote:'Invented junior electrical vacancy',eligibility_review:'The profile meets the listed requirements.'}},fetcher),/vacancy quote/);
+});
+
+test('real punctuation regression verifies; a different mailbox or invented ownership does not',async()=>{
+ const {c}=await setup(),p=await packet(c);
+ const source=html.replace('Email: sara.ahmed@example.com','Email: <a href="mailto:sara.ahmed@example.com">sara.ahmed@example.com</a>.');
+ const f=async u=>new Response(String(u).endsWith('robots.txt')?'User-agent: *\nAllow: /':source,{headers:{'content-type':'text/html'}});
+ await verifyEvidence({...p,contact_email_quote:p.contact_email_quote+'.'},f);
+ await assert.rejects(verifyEvidence({...p,email:'sara.ahmed@example.com.evil'},f),/email\/name/);
+ await assert.rejects(verifyEvidence({...p,contact_email_quote:'Different Person sara.ahmed@example.com'},f),/email\/name/);
+});
+
+test('delivered contact mix is derived from actual stored receipts',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});const {run_id}=await c.startRun();const q=await c.queue(await packet(c),run_id),r=await c.reserve(q.id);await c.receipt({reservation_token:r.reservation_token,message_id:'1000000000000001'});
+ const report=await c.finishRun(run_id,{discovered:1,researched:1,queued:99,sent:99,held:0,reasons:[]});assert.equal(report.named_sent,1);assert.equal(report.recruitment_sent,0);assert.deepEqual((await c.status()).contact_mix,{named_person:1,recruitment_team:0});
+});

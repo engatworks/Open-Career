@@ -1,4 +1,4 @@
-# Open Career — cloud edition 0.3.1
+# Open Career — cloud edition 0.4.0
 
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
@@ -13,8 +13,8 @@ The site is owner-private and relies on platform authentication. Its native MCP 
 ## Cloud workflow
 
 1. Retrieve `/api/agent-context` and outreach history, or use the private MCP tools.
-2. Claim a research run; research 40–60 Saudi employers and try to produce 10–15 meaningful, evidence-backed inquiries.
-3. Record actual company/person/project sources, published named-person work email or explicit official careers-inbox invitation, contact role and candidate evidence. Preserve supervised scope. Reject internships, senior jobs and Saudi-national-only vacancies.
+2. Claim a research run; use the discovery pool to deeply research 10–15 Saudi employers of all sizes, prioritizing relevant named people.
+3. Record actual company/person/project sources, published named-person work email or explicit official careers-inbox invitation, contact role and candidate evidence. Preserve supervised scope. Reject ineligible vacancies, then separately consider an honest speculative paid-junior referral inquiry. No advertised vacancy or job-board account is required. Careers inboxes require a documented named-person search first.
 4. Submit packets through `queue_verified_outreach`; the tracker independently re-fetches cited quotations and freezes CV/profile state.
 5. `prepare_delivery` atomically reserves one contact and a quota slot, returning an exact Gmail MIME tree with CV.pdf.
 6. Forward that object unchanged through the connected Gmail tool. Record actual returned Gmail message/thread IDs, then reconcile replies and declines.
@@ -25,28 +25,32 @@ The site is owner-private and relies on platform authentication. Its native MCP 
 
 This Sites/Vinext/Cloudflare Workers project uses D1 and R2 bindings provisioned by hosting. No personal profile, CV, token or recipient history is committed. Upload setup through authenticated API operations after publication.
 
-Use Node.js 22.13 or newer and the pnpm version pinned in `package.json`. Production hosting and authentication use ChatGPT Sites; a generic static host is insufficient.
-
 ```sh
-pnpm install --frozen-lockfile
+corepack pnpm install --frozen-lockfile
 node --test tests/cloud.test.mjs
 node node_modules/typescript/bin/tsc --noEmit
 node scripts/prepare-career-ui.mjs
 pnpm build
 ```
 
-Use the supported Sites workflow for source synchronization, migration application, packaging and private publication. This public export includes only generic `.openai/hosting.json` bindings; initialize a new private Site for your own deployment and preserve the project identity it returns. Migrations are immutable once applied. The `ui/` source and preparation script preserve the previously tested responsive design.
+Use the supported Sites workflow for source synchronization, migration application, packaging and private publication. This public export includes generic storage bindings only; initialize a new private Site and preserve the project identity it returns. Migrations are immutable once applied. The `ui/` source and preparation script preserve the previously tested responsive design.
 
 ## Proven limitations
 
 Quotations prove publication, not complete semantic truth; the research agent must also review facts and prose. Some websites block fetches or omit a trustworthy recruitment route. Recipient yield can fall below 10. Confirmation of a Gmail send and D1 receipt is not a distributed transaction; ambiguous outcomes remain quarantined. No automated follow-ups or reply-body actions occur outside the authorized job outreach scope.
 
-The old Python edition remains an optional local developer toolkit, not the required deployment model. This repository is the public source distribution. The running private Site has its own source repository and deployment workflow; pushing here does not automatically redeploy that Site.
+The old Python edition remains an optional local developer toolkit, not the required deployment model. The public GitHub repository is a sanitized source mirror. Private Sites hosting has its own deployment history; updating GitHub does not automatically deploy the private workspace.
 
 See `docs/RESEARCH.md` and `docs/CLOUD_RUNBOOK.md` for decisions and acceptance checks.
 
+## People-first contact discovery
+
+Use `POST /api/research-plan` with a company domain for English/Arabic search queries. Use `POST /api/source-inspection` with a public HTTPS page to retrieve exact published emails, local contact contexts and further source links. This uses the MIT-licensed htmlparser2 already in the app. It does not infer people, generate addresses, probe mailboxes or provide an Apollo-sized contact database. Named ownership and current role still need source review.
+
+The Research screen offers the same page explorer. Run reports and the dashboard distinguish named-person deliveries from recruitment-inbox deliveries. See `docs/CONTACT_DISCOVERY.md` for the free-tool comparison and remaining limits.
+
 ## Source provenance and privacy
 
-This public export is based on cloud source commit `e738f108fe021dde8fe7e54b2cc556c07deed96e` (version 0.3.1). The application logic is unchanged. Deployment identity and generated compiler state are excluded, receipt test fixtures use fictional IDs, and these public setup instructions are updated. No live candidate profile, CV bytes, Gmail credentials, contact records, or runtime database is included.
+Sanitized export of cloud source commit `c5048abe92dfac43dd4fbecc115f7d8dee99b312`, version 0.4.0. No candidate profile, CV, access credentials, contact records or runtime database is included. Private deployment identity and generated compiler state are excluded. Test receipts are fictional.
 
-Original Open Career code is MIT licensed. Bundled third-party components retain their existing license notices.
+Original Open Career code is MIT licensed; bundled third-party components retain their licenses.
