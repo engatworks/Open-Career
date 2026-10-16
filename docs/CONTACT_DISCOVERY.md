@@ -54,3 +54,32 @@ Reuse [htmlparser2](https://github.com/fb55/htmlparser2), MIT licensed, already 
 ## Remaining limits
 
 No source-based method can reveal an unpublished mailbox. Public pages can be stale. PDF-only contacts, protected pages and JavaScript-only content may remain held until another source supports them. Exact publication does not guarantee deliverability or a vacancy. Daily research and named-contact yield must be reported honestly, including shortfalls.
+
+## Saudi directories and community findings — 0.4.1
+
+The useful equivalent of a yellow book is a combination of sources, not one unlimited employee database. The source catalog is available in the Research screen, research-plan response and durable agent guide.
+
+| Source | Use | Boundary |
+| --- | --- | --- |
+| [Muqawil](https://www.muqawil.org/en/contractors) | Official contractor discovery by specialization, size and location | [Service description](https://www.muqawil.org/en/contractors/info) explicitly says free; does not supply verified employee identities. Search may time out. |
+| [Saudi Elenex](https://saudielenex.com/exhibitors-list/) | Electrical-sector companies, countries and websites | Listed event dates are 2–5 November 2026; participation is not a vacancy. Confirm Saudi operations. |
+| [ISA Saudi Automation committee](https://www.isasaudiconference.com/committee) | Named technical professionals with employers and roles | Event dated 12–14 October 2026; still needs exact published work-email evidence. |
+| [Saudi Energy supplier list](https://www.se.com.sa/-/media/sec/Our-Partners/Our-Suppliers/LIST-OF-QUALIFIED-MANUFACTURERS-SUPPLIERSS---March-2026.ashx) | Electrical manufacturers and suppliers | March 2026 PDF; discovery only, not current personal-contact proof. |
+| [BluePages](https://bluepages.com.sa/en) | Business activity and city discovery | Public access does not establish an open-data licence. |
+| [Saudian Yellowpages](https://www.saudianyellowpages.com/) | Additional local SMEs | Incomplete/stale entries need original-source checks. |
+
+[SaudiaYP Data Hub terms](https://www.saudiayp.com/saas/terms) restrict exports and automated extraction unless permitted by a plan. No bulk scraper is implemented. Chamber and MODON directories may help manual discovery, but no working integration is claimed.
+
+Community review:
+
+- [Reddit: self-hosted Apollo-style UI](https://www.reddit.com/r/selfhosted/comments/1vgaha5/self_hosted_apollo_style_prospecting_ui_mit/) describes an interface over Blitz API. Open-source UI does not make its underlying data free.
+- [Reddit: self-hosted LeadAce](https://www.reddit.com/r/selfhosted/comments/1w0rdsf/selfhosted_alternative_to_apollo_and_lemlist_for/) explicitly describes a modified licence, paid Cloudflare dependency and limited supported sending countries. It does not meet this deployment's requirements.
+- [Reddit: cold-email infrastructure](https://www.reddit.com/r/selfhosted/comments/1vxsqha/i_opensourced_my_coldemail_infrastructure_smtp/) mixes published addresses with pattern generation and SMTP probes. Those are not substitutes for person/email publication evidence and are not enabled here. Community experiences are anecdotal, not reliability benchmarks.
+
+[Wikidata](https://www.wikidata.org/wiki/Wikidata:Copyright) provides CC0 structured data; [OpenStreetMap](https://www.openstreetmap.org/copyright) provides ODbL geographic/business data. Neither was established as a comprehensive Saudi employee-email database. Crawlers such as Scrapy and Crawl4AI are software, not contact datasets. Keep the existing bounded HTML parser and connected search; no new paid API, browser farm or always-on laptop is required.
+
+## Required research record
+
+Every new packet must include `named_search` and `research_review`: company activity and Saudi presence; person/employer/role analysis; selection reason; two distinct original source URLs; actual name/employer conflict queries and outcome; check timestamp within 24 hours; unresolved-conflict flag; honest limitations. Missing, stale or conflicting reviews fail before reservation. This is a review record, not an automatic truth detector: exact publication and company-fact quotations are independently fetched again.
+
+Use directories to build a varied pool, investigate 10–15 employers, then contact only eligible people. Keep counts for companies researched, published-address candidates and actual sent messages separate. A shortfall is preferable to invented addresses or generic-inbox padding.

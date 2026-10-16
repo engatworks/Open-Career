@@ -23,7 +23,7 @@ const tools=[
 ];
 export async function POST(request:Request){let rpc:any;try{if(Number(request.headers.get('content-length')||0)>200000)throw Error('MCP input too large');rpc=await request.json();if(!rpc||rpc.jsonrpc!=='2.0')throw Error('Invalid JSON-RPC request');
  if(rpc.method==='server/discover')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{supportedVersions:['2026-07-28'],capabilities:{tools:{}}}});
- if(rpc.method==='initialize')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'Open Career',version:'0.4.0'}}});
+ if(rpc.method==='initialize')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'Open Career',version:'0.4.1'}}});
  if(rpc.method==='tools/list')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{tools}});
  if(rpc.method==='notifications/initialized')return new Response(null,{status:202});
  if(rpc.method!=='tools/call')throw Error('Unknown method');
