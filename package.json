@@ -1,6 +1,6 @@
 {
   "name": "open-career-cloud",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -38,6 +38,7 @@
     "robots-parser": "^3.0.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "unpdf": "^1.8.1",
     "vaul": "^1.1.2",
     "zod": "^3.25.76"
   },

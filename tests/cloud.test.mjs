@@ -53,7 +53,7 @@ test('hidden/attribute-only addresses and scripts cannot supply public identity 
 test('source inspection respects robots and exposes publication without claiming identity',async()=>{
  const r=await inspectSource('https://example.com/team',fetcher);assert.ok(r.contacts.some(x=>x.email==='sara.ahmed@example.com'));assert.match(r.source_sha256,/^[a-f0-9]{64}$/);assert.equal(r.contacts[0].identity_verified,false);
  await assert.rejects(inspectSource('https://example.com/team',async()=>new Response('User-agent: *\nDisallow: /')),/robots/);
- await assert.rejects(inspectSource('https://example.com/team',async u=>new Response(String(u).endsWith('robots.txt')?'User-agent: *\nAllow: /':'PDF',{headers:{'content-type':'application/pdf'}})),/expected public HTML/);
+ await assert.rejects(inspectSource('https://example.com/team',async u=>new Response(String(u).endsWith('robots.txt')?'User-agent: *\nAllow: /':'PDF',{headers:{'content-type':'application/pdf'}})),/Invalid PDF signature/);
 });
 
 test('speculative outreach needs no vacancy; advertised roles and recruitment fallbacks need evidence',async()=>{
@@ -87,4 +87,44 @@ test('research review rejects missing, stale, duplicate-source and conflicting p
 });
 test('legacy packets lacking research review cannot reserve delivery',async()=>{
  const {c}=await setup();await c.setSettings({live_send_enabled:true});const p=await packet(c),q=await c.queue(p);delete p.research_review;await c.stmt('UPDATE outreach SET packet=? WHERE id=?',JSON.stringify(p),q.id).run();await assert.rejects(c.reserve(q.id));assert.equal(await c.quota(),0);assert.equal((await c.list())[0].status,'queued');
+});
+
+const { textPDF } = await import('./pdf-fixture.mjs');
+const pdfFetch = bytes => async url => String(url).endsWith('/robots.txt')
+ ? new Response('User-agent: *\nAllow: /') : new Response(bytes, {headers:{'content-type':'application/pdf'}});
+
+test('official PDF evidence supports inspection, queue and fresh reservation without changing CV',async()=>{
+ const bytes=textPDF([['Sara Ahmed - Engineering Manager. Email: sara.ahmed@example.com','The new substation commissioning program has started.']]);
+ const f=pdfFetch(bytes), result=await inspectSource('https://example.com/contacts.pdf',f);
+ assert.equal(result.source_format,'pdf');assert.equal(result.total_pages,1);assert.equal(result.source_sha256,await hash(bytes));
+ assert.equal(result.contacts[0].email,'sara.ahmed@example.com');assert.equal(result.contacts[0].page,1);assert.equal(result.contacts[0].identity_verified,false);
+ const {c,cv}=await setup();c.fetcher=f;const p=await packet(c);
+ p.contact_role_quote=p.contact_role_quote.replace('—','-');p.contact_email_quote=p.contact_email_quote.replace('—','-');
+ const q=await c.queue(p);assert.equal(q.evidence.fingerprints[0].format,'pdf');
+ await c.setSettings({live_send_enabled:true});const r=await c.reserve(q.id);
+ assert.deepEqual(Buffer.from(r.payload.parts[1].body.base64_url_content,'base64url'),Buffer.from(cv));
+});
+test('PDF page boundaries cannot invent email ownership and changed PDF blocks reservation',async()=>{
+ const {c}=await setup(),p=await packet(c);
+ p.contact_role_quote='Sara Ahmed Engineering Manager';p.contact_email_quote='Sara Ahmed Engineering Manager sara.ahmed@example.com';
+ const split=textPDF([['Sara Ahmed Engineering Manager'],['sara.ahmed@example.com','The new substation commissioning program has started']]);
+ await assert.rejects(verifyEvidence(p,pdfFetch(split)),/email\/name/);
+ c.fetcher=pdfFetch(textPDF([[p.contact_email_quote,p.company_fact.source_quote]]));
+ const q=await c.queue(p);await c.setSettings({live_send_enabled:true});c.fetcher=pdfFetch(split);
+ await assert.rejects(c.reserve(q.id),/email\/name/);assert.equal(await c.quota(),0);
+});
+test('PDF parser rejects malformed, image-only, oversized and excessive-page inputs',async()=>{
+ for(const [bytes,error] of [[new TextEncoder().encode('fake'),/signature/],[textPDF([[]]),/no extractable text/],[textPDF(Array.from({length:31},()=>['Sample'])),/30 pages/],[new Uint8Array(2000001),/2 MB/]])
+  await assert.rejects(inspectSource('https://example.com/file.pdf',pdfFetch(bytes)),error);
+});
+test('redirect targets get robots checks and cross-origin destinations remain explicit holds',async()=>{
+ let forbiddenRead=false;
+ const f=async url=>{
+  if(String(url).endsWith('/robots.txt'))return new Response('User-agent: *\nDisallow: /private');
+  if(String(url).endsWith('/start'))return new Response(null,{status:302,headers:{location:'/private'}});
+  forbiddenRead=true;return new Response(html,{headers:{'content-type':'text/html'}});
+ };
+ await assert.rejects(inspectSource('https://example.com/start',f),/robots/);assert.equal(forbiddenRead,false);
+ await assert.rejects(inspectSource('https://example.com/start',async url=>String(url).endsWith('/robots.txt')?new Response('User-agent: *\nAllow: /'):new Response(null,{status:302,headers:{location:'https://other.example.com/team'}})),/inspect destination separately: https:\/\/other.example.com\/team/);
+ const r=await inspectSource('https://example.com/empty',async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':'<script>render()</script>',{headers:{'content-type':'text/html'}}));assert.match(r.diagnostics[0],/JavaScript shell/);
 });
