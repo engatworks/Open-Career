@@ -1,0 +1,27 @@
+name: Opportunity Lab checks
+on:
+  push:
+    branches:
+      - feat/global-opportunity-lab
+    paths:
+      - 'lib/opportunity-fit.mjs'
+      - 'tests/opportunity-fit.test.mjs'
+      - '.github/workflows/opportunity-lab.yml'
+  pull_request:
+    paths:
+      - 'lib/opportunity-fit.mjs'
+      - 'tests/opportunity-fit.test.mjs'
+      - 'app/lab/**'
+      - '.github/workflows/opportunity-lab.yml'
+permissions:
+  contents: read
+jobs:
+  evidence-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check lib/opportunity-fit.mjs
+      - run: node --test tests/opportunity-fit.test.mjs
