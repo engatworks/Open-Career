@@ -36,3 +36,5 @@ jobs:
       - run: corepack enable
       - run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - run: node node_modules/typescript/bin/tsc --noEmit
+      - run: node scripts/prepare-career-ui.mjs
+      - run: corepack pnpm build
