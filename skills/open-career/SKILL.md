@@ -1,6 +1,6 @@
 ---
 name: open-career
-summary: Source-backed job research, applications and recruiter outreach via Open Career MCP tools and user-authorized host actions.
+description: Research job opportunities, manage evidence-backed employer outreach, and prepare or track applications using the Open Career MCP server and explicitly authorized AI host actions. Use when searching for work, emailing recruiters, applying to vacancies, tracking applications, or reconciling responses.
 ---
 
 # Open Career — portable MVP skill
