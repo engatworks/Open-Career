@@ -96,7 +96,7 @@ test('missing relevant scopes block account creation and application execution',
 });
 test('no plaintext passwords, passwords masquerading as generic credentials refused',async()=>{
  const a=await ready();
- await assert.rejects(()=>a.registerAccount({portalUrl:'https://jobs.example',loginEmail:'a@example.com',password:'secret'}),/never accepts passwords/);
+ await assert.rejects(()=>a.registerAccount({portalUrl:'https://jobs.example',loginEmail:'a@example.com',password:'secret'}),/passwords and secrets are forbidden/);
  const r=await a.registerAccount({portalUrl:'https://jobs.example',loginEmail:'a@example.com'});
  assert.equal(r.passwordStored,false);
  assert.equal((await a.accounts()).length,1);
@@ -114,4 +114,27 @@ test('external provider approval remains a separate unanswered question',async()
  assert.equal(permission.open_career_granted,true);
  assert.equal(permission.external_provider_permission,'unverified');
  assert.equal(permission.requires_host_authorization,true);
+});
+
+test('untrusted source claims never override an agent report',async()=>{
+ const a=await ready();
+ const {id}=await a.prepare(application,cv);
+ await a.result({id,state:'attempted',evidence:{source:'employer_verified',note:'form clicked'}});
+ const row=(await a.applications()).find(x=>x.id===id);
+ assert.equal(JSON.parse(row.evidence).source,'agent_report');
+});
+test('competing workers cannot both claim the same prepared submission',async()=>{
+ const a=await ready();
+ const {id}=await a.prepare(application,cv);
+ const outcomes=await Promise.allSettled([
+  a.result({id,state:'attempted'}),
+  a.result({id,state:'attempted'}),
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(outcomes.filter(x=>x.status==='rejected').length,1);
+});
+test('credential aliases cannot be registered as extra account fields',async()=>{
+ const a=await ready();
+ await assert.rejects(()=>a.registerAccount({portalUrl:'https://jobs.example',loginEmail:'a@example.com',credential:'hidden'}),/passwords and secrets are forbidden/);
+ await assert.rejects(()=>a.registerAccount({portalUrl:'https://jobs.example',loginEmail:'a@example.com',sessionToken:'hidden'}),/passwords and secrets are forbidden/);
 });
