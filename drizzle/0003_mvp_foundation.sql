@@ -36,8 +36,9 @@ CREATE TABLE mvp_portal_accounts (
   site_host TEXT NOT NULL,
   login_email TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(account_id, site_host, login_email)
+  updated_at TEXT NOT NULL
 );
+--> statement-breakpoint
+CREATE UNIQUE INDEX mvp_portal_owner_login ON mvp_portal_accounts(account_id,site_host,login_email);
 --> statement-breakpoint
 CREATE INDEX mvp_portal_owner ON mvp_portal_accounts(account_id);
