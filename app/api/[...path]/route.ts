@@ -7,13 +7,15 @@ export const dynamic='force-dynamic';
 function response(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});}
 async function bounded(request:Request,limit=200000){const reader=request.body?.getReader();if(!reader)throw Error('Request body missing');const parts:Uint8Array[]=[];let total=0;while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>limit){await reader.cancel();throw Error('Request body too large');}parts.push(value);}const bytes=new Uint8Array(total);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;}
 async function json(request:Request){return JSON.parse(new TextDecoder().decode(await bounded(request)));}
-async function handler(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const career=new Career(env);
+async function handler(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const user=await getChatGPTUser();
+ if(!user?.userId)return response({error:'Sign in required for private career records'},401);
+ const workflow=new MVPWorkflow(env.DB,user.userId);
+ // Private reads include the CV payload, outreach history, contact identities, and candidate profile.
+ if(method==='GET')await workflow.assert('research:read');
+ const career=new Career(env);
  // Versioned consent is checked on every mutating legacy REST endpoint,
  // not only the new MCP tools. Site privacy is NOT a substitute for action grants.
  if(method==='POST'&&path!=='run'&&!path.startsWith('send/')&&path!=='sync'){
-  const user=await getChatGPTUser();
-  if(!user?.userId)return response({error:'Sign-in required for changes'},401);
-  const workflow=new MVPWorkflow(env.DB,user.userId);
   await workflow.assert(path==='reserve'?'email:send':'records:write');
  }
  if(method==='GET'){
