@@ -7,6 +7,10 @@ async function bounded(request:Request,limit=200000){const reader=request.body?.
 async function json(request:Request){return JSON.parse(new TextDecoder().decode(await bounded(request)));}
 async function handler(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const career=new Career(env);
  if(method==='GET'){
+  if(path==='companies')return response(await career.contacts().companies(Object.fromEntries(url.searchParams)));
+  if(path==='contacts')return response(await career.contacts().search(Object.fromEntries(url.searchParams)));
+  if(path==='contacts/stats')return response(await career.contacts().stats());
+  if(path==='contacts/detail')return response(await career.contacts().detail(url.searchParams.get('email')));
   if(path==='status')return response(await career.status());
   if(path==='profile')return response(await career.profile()||{name:'',evidence:[]});
   if(path==='outreach')return response({items:await career.list()});
@@ -20,6 +24,9 @@ async function handler(request:Request){try{const url=new URL(request.url),path=
  if(method==='POST'){
   if(path==='cv')return response(await career.uploadCV(await bounded(request,5000000)));
   const data=await json(request);
+  if(path==='companies/import')return response(await career.contacts().importCompanies(data));
+  if(path==='contacts/import')return response(await career.contacts().import(data));
+  if(path==='contacts/collect')return response(await career.contacts().collect(data));
   if(path==='profile')return response(await career.setProfile(data));
   if(path==='settings')return response(await career.setSettings(data));
   if(path==='source-inspection')return response(await career.inspectSource(data.url));

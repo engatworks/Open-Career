@@ -63,3 +63,6 @@ next-env.d.ts
 *.sqlite
 *.sqlite3
 *.db
+
+__pycache__/
+*.py[cod]

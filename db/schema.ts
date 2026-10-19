@@ -16,3 +16,20 @@ export const suppression=sqliteTable('suppression',{email:text('email').primaryK
 export const leads=sqliteTable('leads',{id:text('id').primaryKey(),domain:text('domain').notNull().unique(),company:text('company').notNull(),website:text('website').notNull(),status:text('status').notNull().default('discovered'),research:text('research').notNull().default('{}'),reason:text('reason'),updated_at:text('updated_at').notNull()});
 export const runs=sqliteTable('runs',{id:text('id').primaryKey(),kind:text('kind').notNull(),status:text('status').notNull(),started_at:text('started_at').notNull(),heartbeat_at:text('heartbeat_at').notNull(),finished_at:text('finished_at'),report:text('report').notNull().default('{}')},t=>[uniqueIndex('one_running_research').on(t.status).where(sql`${t.status}='running'`)]);
 export const events=sqliteTable('events',{id:integer('id').primaryKey({autoIncrement:true}),at:text('at').notNull(),kind:text('kind').notNull(),detail:text('detail').notNull()});
+
+export const contactIndex=sqliteTable('contact_index',{
+ email:text('email').primaryKey(),company_domain:text('company_domain').notNull(),company:text('company').notNull().default(''),
+ name:text('name').notNull().default(''),role:text('role').notNull().default(''),location:text('location').notNull().default(''),
+ created_at:text('created_at').notNull(),updated_at:text('updated_at').notNull(),
+},t=>[index('contact_index_domain').on(t.company_domain)]);
+export const contactSources=sqliteTable('contact_sources',{
+ id:text('id').primaryKey(),email:text('email').notNull(),source_url:text('source_url'),kind:text('kind').notNull(),provider:text('provider').notNull(),
+ fingerprint:text('fingerprint').notNull(),observed_at:text('observed_at').notNull(),evidence:text('evidence').notNull(),
+},t=>[index('contact_sources_email').on(t.email)]);
+export const sourceCollections=sqliteTable('source_collections',{
+ id:text('id').primaryKey(),started_at:text('started_at').notNull(),finished_at:text('finished_at').notNull(),report:text('report').notNull(),
+});
+export const companyInventory=sqliteTable('company_inventory',{
+ domain:text('domain').primaryKey(),name:text('name').notNull(),industry:text('industry').notNull().default(''),location:text('location').notNull().default(''),
+ provider:text('provider').notNull(),source_url:text('source_url').notNull(),attribution:text('attribution').notNull().default(''),updated_at:text('updated_at').notNull(),
+});

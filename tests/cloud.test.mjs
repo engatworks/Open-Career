@@ -6,7 +6,7 @@ import { Career, hash, validatePacket, visibleText, verifyEvidence, sourceURL, i
 import { extractPublicSource } from '../lib/public-source.mjs';
 
 class D1 {
- constructor(){this.db=new DatabaseSync(':memory:');this.db.exec(fs.readFileSync('drizzle/0000_tearful_brood.sql','utf8').replaceAll('--> statement-breakpoint',''));}
+ constructor(){this.db=new DatabaseSync(':memory:');for(const file of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())this.db.exec(fs.readFileSync('drizzle/'+file,'utf8').replaceAll('--> statement-breakpoint',''));}
  prepare(sql){const db=this.db;let values=[];const api={bind(...a){values=a;return api;},async first(){return db.prepare(sql).get(...values)||null;},async all(){return {results:db.prepare(sql).all(...values)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...values).changes)}};}};return api;}
  async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());this.db.exec('COMMIT');return results;}catch(e){this.db.exec('ROLLBACK');throw e;}}
 }
@@ -127,4 +127,31 @@ test('redirect targets get robots checks and cross-origin destinations remain ex
  await assert.rejects(inspectSource('https://example.com/start',f),/robots/);assert.equal(forbiddenRead,false);
  await assert.rejects(inspectSource('https://example.com/start',async url=>String(url).endsWith('/robots.txt')?new Response('User-agent: *\nAllow: /'):new Response(null,{status:302,headers:{location:'https://other.example.com/team'}})),/inspect destination separately: https:\/\/other.example.com\/team/);
  const r=await inspectSource('https://example.com/empty',async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':'<script>render()</script>',{headers:{'content-type':'text/html'}}));assert.match(r.diagnostics[0],/JavaScript shell/);
+});
+
+test('contact imports are atomic, deduplicated and never promote provider claims to publication or delivery',async()=>{
+ const {c}=await setup(),db=c.contacts();
+ const input={provider:'Permitted provider export',csv:'Email,First Name,Last Name,Job Title,Company\nsara.ahmed@example.com,Sara,Ahmed,Engineering Manager,Example Power'};
+ await db.import(input);await db.import(input);
+ assert.equal((await db.search()).total,1);assert.equal((await db.stats()).published_candidates,0);assert.equal((await c.list()).length,0);
+ const item=(await db.search({q:'Sara'})).items[0];assert.equal(item.name,'Sara Ahmed');assert.equal(item.delivery_eligible,false);assert.equal(item.source_count,1);
+ await assert.rejects(db.import({provider:'Test',records:[{email:'valid@example.com'},{email:'invalid'}]}));assert.equal((await db.search()).total,1);
+ await assert.rejects(db.import({provider:'Test',records:[{email:'guess@example.com',email_source:'inferred'}]}),/inferred/);
+ await assert.rejects(db.import({provider:'Test',records:Array.from({length:101},()=>({email:'x@example.com'}))}),/1–100/);
+});
+test('source collection records original evidence and failures; dedupe and suppression remain in force',async()=>{
+ const {c}=await setup(),db=c.contacts();
+ const input={urls:['https://example.com/team']};await db.collect(input);await db.collect(input);
+ const stats=await db.stats();assert.equal(stats.published_candidates,1);assert.equal(stats.counts.contacts,1);
+ const record=await db.detail('sara.ahmed@example.com');assert.equal(record.sources.length,1);assert.match(record.sources[0].evidence.contexts.join(' '),/Sara Ahmed/);
+ assert.equal((await db.search({kind:'named'})).total,0); // Never infer a name from adjacent text.
+ await c.suppress('sara.ahmed@example.com');assert.equal((await db.search({kind:'uncontacted'})).total,0);
+ c.fetcher=async()=>new Response('User-agent: *\nDisallow: /');const blocked=await db.collect(input);assert.equal(blocked.held,1);assert.match(blocked.results[0].reason,/robots/);
+ assert.equal((await c.list()).length,0);assert.equal(await c.quota(),0);
+});
+test('company bulk imports retain source attribution and do not invent people',async()=>{
+ const {c}=await setup(),db=c.contacts();const p={provider:'PDL',source_url:'https://docs.peopledatalabs.com/docs/free-company-dataset',attribution:'CC BY 4.0',records:[{name:'Example Power',website:'https://www.example.com',industry:'Electrical',country:'saudi arabia'}]};
+ await db.importCompanies(p);await db.importCompanies(p);const result=await db.companies({q:'saudi'});assert.equal(result.total,1);assert.equal(result.items[0].attribution,'CC BY 4.0');assert.equal((await db.search()).total,0);
+ await assert.rejects(db.importCompanies({...p,records:[{name:'Bad',website:'https://127.0.0.1'}]}),/public HTTPS/);
+ assert.equal((await db.companies({q:"%' OR 1=1 --"})).total,0);
 });

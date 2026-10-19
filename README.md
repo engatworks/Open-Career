@@ -1,4 +1,4 @@
-# Open Career — cloud edition 0.4.0
+# Open Career — cloud edition 0.5.0
 
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
@@ -26,14 +26,14 @@ The site is owner-private and relies on platform authentication. Its native MCP 
 This Sites/Vinext/Cloudflare Workers project uses D1 and R2 bindings provisioned by hosting. No personal profile, CV, token or recipient history is committed. Upload setup through authenticated API operations after publication.
 
 ```sh
-corepack pnpm install --frozen-lockfile
+node "$SITES_PNPM_BIN" install
 node --test tests/cloud.test.mjs
 node node_modules/typescript/bin/tsc --noEmit
 node scripts/prepare-career-ui.mjs
-pnpm build
+node /path/to/sites/scripts/build-site.mjs
 ```
 
-Use the supported Sites workflow for source synchronization, migration application, packaging and private publication. This public export includes generic storage bindings only; initialize a new private Site and preserve the project identity it returns. Migrations are immutable once applied. The `ui/` source and preparation script preserve the previously tested responsive design.
+Use the supported Sites workflow for source synchronization, migration application, packaging and private publication. Keep `.openai/hosting.json` identity and bindings; migrations are immutable once applied. The `ui/` source and preparation script preserve the previously tested responsive design.
 
 ## Proven limitations
 
@@ -49,8 +49,6 @@ Use `POST /api/research-plan` with a company domain for English/Arabic search qu
 
 The Research screen offers the same page explorer. Run reports and the dashboard distinguish named-person deliveries from recruitment-inbox deliveries. See `docs/CONTACT_DISCOVERY.md` for the free-tool comparison and remaining limits.
 
-## Source provenance and privacy
+### Contact database
 
-Sanitized export of cloud source commit `c5048abe92dfac43dd4fbecc115f7d8dee99b312`, version 0.4.0. No candidate profile, CV, access credentials, contact records or runtime database is included. Private deployment identity and generated compiler state are excluded. Test receipts are fictional.
-
-Original Open Career code is MIT licensed; bundled third-party components retain their licenses.
+The private Contact database page searches persistent people/address candidates and a separate company inventory. Bounded original-page collection retains provenance; permitted CSV imports never confer delivery eligibility. See [Database workflow](docs/DATABASE_WORKFLOW.md).

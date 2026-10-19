@@ -6,7 +6,7 @@ No verified free product offers Apollo's coverage and automation capacity withou
 
 1. Identify a relevant Saudi employer of any size and a concrete electrical/electronics activity.
 2. Find a relevant engineering, operations, maintenance or project manager; then HR/recruiting; consider a founder/general manager for a smaller business.
-3. Use bilingual domain searches, official team/contact pages, project announcements and professional profiles. Public PDFs/directories can reveal names, but current delivery verification needs fetchable public HTML evidence.
+3. Use bilingual domain searches, official team/contact pages, project announcements and professional profiles. Public PDFs/directories can reveal names, and bounded text PDFs or public HTML can support delivery evidence after original-layout and current-role checks.
 4. Reopen original sources for the exact corporate email bound to the name and role. Resolve conflicting employment evidence. A current page fetch does not prove the employer updated the contact recently.
 5. Ask honestly about paid junior work or a referral. No advertised opening, application account or careers-page invitation is needed for a relevant named-person inquiry. An ineligible vacancy does not exclude its employer from this separate assessment.
 6. Use an expressly invited careers inbox only after recording actual named-person searches, source URLs and why no suitable person was usable. Do not pad delivery counts with general inboxes.
@@ -53,7 +53,7 @@ Reuse [htmlparser2](https://github.com/fb55/htmlparser2), MIT licensed, already 
 
 ## Remaining limits
 
-No source-based method can reveal an unpublished mailbox. Public pages can be stale. PDF-only contacts, protected pages and JavaScript-only content may remain held until another source supports them. Exact publication does not guarantee deliverability or a vacancy. Daily research and named-contact yield must be reported honestly, including shortfalls.
+No source-based method can reveal an unpublished mailbox. Public pages can be stale. Scanned/oversized PDFs, protected pages and JavaScript-only content remain held until another source supports them. Exact publication does not guarantee deliverability or a vacancy. Daily research and named-contact yield must be reported honestly, including shortfalls.
 
 ## Saudi directories and community findings — 0.4.1
 
@@ -83,3 +83,7 @@ Community review:
 Every new packet must include `named_search` and `research_review`: company activity and Saudi presence; person/employer/role analysis; selection reason; two distinct original source URLs; actual name/employer conflict queries and outcome; check timestamp within 24 hours; unresolved-conflict flag; honest limitations. Missing, stale or conflicting reviews fail before reservation. This is a review record, not an automatic truth detector: exact publication and company-fact quotations are independently fetched again.
 
 Use directories to build a varied pool, investigate 10–15 employers, then contact only eligible people. Keep counts for companies researched, published-address candidates and actual sent messages separate. A shortfall is preferable to invented addresses or generic-inbox padding.
+
+## Durable database — 0.5.0
+
+See [DATABASE_WORKFLOW.md](DATABASE_WORKFLOW.md) for collection, CSV imports, free-provider access and the measured limits of open-source Apollo alternatives.
