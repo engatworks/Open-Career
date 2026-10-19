@@ -8,13 +8,13 @@ on:
       - 'db/schema.ts'
       - 'app/mcp/route.ts'
       - 'app/api/mvp/**'
+      - 'app/api/[...path]/route.ts'
       - 'app/consent/**'
       - '.github/workflows/mvp-foundation.yml'
   push:
     branches: [feat/mvp-plugin-authorization-foundation]
 permissions:
   contents: read
-  issues: write
 jobs:
   mvp-tests:
     runs-on: ubuntu-latest
@@ -41,23 +41,4 @@ jobs:
       - name: Install pinned dependencies
         run: pnpm install --frozen-lockfile
       - name: TypeScript verification
-        id: typecheck
-        continue-on-error: true
-        run: pnpm exec tsc --noEmit > /tmp/mvp-tsc.log 2>&1
-      - name: Report compiler diagnostic on the draft PR
-        if: ${{ steps.typecheck.outcome == 'failure' && github.event_name == 'pull_request' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          printf 'TypeScript diagnostics from automated MVP check:\n\n' > /tmp/mvp-tsc-comment
-          printf '%s\n' '~~~' >> /tmp/mvp-tsc-comment
-          head -c 14000 /tmp/mvp-tsc.log >> /tmp/mvp-tsc-comment
-          printf '\n%s\n' '~~~' >> /tmp/mvp-tsc-comment
-          gh issue comment "$PR_NUMBER" --body-file /tmp/mvp-tsc-comment
-      - name: Fail if TypeScript verification failed
-        if: ${{ steps.typecheck.outcome == 'failure' }}
-        run: |
-          if [ -f /tmp/mvp-tsc.log ]; then cat /tmp/mvp-tsc.log; fi
-          exit 1
-
+        run: pnpm exec tsc --noEmit
