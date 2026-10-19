@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const configuration = sqliteTable('configuration', {key:text('key').primaryKey(),value:text('value').notNull(),revision:integer('revision').notNull().default(0)});
 export const outreach = sqliteTable('outreach', {
@@ -43,7 +43,7 @@ export const mvpAcceptances=sqliteTable('mvp_acceptances',{
 export const mvpGrants=sqliteTable('mvp_grants',{
  account_id:text('account_id').notNull(),scope:text('scope').notNull(),
  granted_at:text('granted_at').notNull(),revoked_at:text('revoked_at'),
-},t=>[uniqueIndex('mvp_grant_identity').on(t.account_id,t.scope)]);
+},t=>[primaryKey({columns:[t.account_id,t.scope]})]);
 export const mvpApplications=sqliteTable('mvp_applications',{
  id:text('id').primaryKey(),account_id:text('account_id').notNull(),
  company_domain:text('company_domain').notNull(),ats_job_id:text('ats_job_id').notNull(),
