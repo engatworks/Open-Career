@@ -19,7 +19,7 @@ export default function ConsentPage(){
  const [agree,setAgree]=useState(false);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
- useEffect(()=>{fetch('/api/mvp/consent',{credentials:'same-origin'}).then(r=>r.json()).then((r:Data)=>{if(r.error)throw Error(r.error);setData(r);setSelected(r.scopes)}).catch(e=>setError(String(e.message||e)))},[]);
+ useEffect(()=>{fetch('/api/mvp/consent',{credentials:'same-origin'}).then(async r=>(await r.json()) as Data).then((r:Data)=>{if(r.error)throw Error(r.error);setData(r);setSelected(r.scopes)}).catch(e=>setError(String(e.message||e)))},[]);
  async function submit(action:'accept'|'revoke',scope?:string){
   setBusy(true);setError('');
   try{
