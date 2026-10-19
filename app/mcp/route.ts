@@ -44,34 +44,34 @@ export async function POST(request:Request){let rpc:any;try{if(Number(request.he
  if(rpc.method==='tools/list')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{tools}});
  if(rpc.method==='notifications/initialized')return new Response(null,{status:202});
  if(rpc.method!=='tools/call')throw Error('Unknown method');
- const c=new Career(env),a=rpc.params?.arguments||{};let result;
- const newNames=new Set(['mvp_consent_status','mvp_check_permission','mvp_list_applications','mvp_prepare_application','mvp_record_application_result','mvp_portal_accounts','mvp_register_portal_account']);
- let mvp;
+ const signedIn=await getChatGPTUser();
+ if(!signedIn?.userId)throw Error('Authenticated owner required for all private MCP data and actions');
+ const mvp=new MVPWorkflow(env.DB,signedIn.userId);
+ const toolName=rpc.params?.name;
  const existingWriteTools=new Set([
   'collect_contact_sources','import_contact_candidates','import_company_inventory','record_employer',
   'start_research_run','heartbeat_research_run','record_recipient_feedback','queue_verified_outreach',
   'prepare_delivery','record_delivery','hold_uncertain_delivery','suppress_contact','record_reply','finish_research_run'
  ]);
- if(existingWriteTools.has(rpc.params?.name)){
-  const signedIn=await getChatGPTUser();
-  if(!signedIn?.userId)throw Error('Authenticated owner required for write operations');
-  const permit=new MVPWorkflow(env.DB,signedIn.userId);
-  await permit.assert(rpc.params?.name==='prepare_delivery'?'email:send':'records:write');
+ // The consent and permission-inspection tools must work before consent is granted.
+ const consentTools=new Set(['mvp_consent_status','mvp_check_permission']);
+ const newTools=new Set(['mvp_list_applications','mvp_prepare_application','mvp_record_application_result','mvp_portal_accounts','mvp_register_portal_account']);
+ // Legacy tools can expose private CV bytes, contact identities and hiring history; reads also require consent.
+ if(!consentTools.has(toolName)&&!newTools.has(toolName)){
+  await mvp.assert(existingWriteTools.has(toolName)
+   ? toolName==='prepare_delivery'?'email:send':'records:write'
+   : 'research:read');
  }
- if(newNames.has(rpc.params?.name)){
-  const signedIn=await getChatGPTUser();
-  if(!signedIn?.userId)throw Error('Sign in with ChatGPT is required for private MVP application tools');
-  mvp=new MVPWorkflow(env.DB,signedIn.userId);
- }
+ const c=new Career(env),a=rpc.params?.arguments||{};let result;
 
  switch(rpc.params?.name){
- case'mvp_consent_status':result=await mvp!.status();break;
- case'mvp_check_permission':result=await mvp!.permission(a.scope);break;
- case'mvp_list_applications':result={items:await mvp!.applications()};break;
- case'mvp_prepare_application':result=await mvp!.prepare(a,(await c.config('cv'))?.sha256||'');break;
- case'mvp_record_application_result':result=await mvp!.result(a);break;
- case'mvp_portal_accounts':result={items:await mvp!.accounts()};break;
- case'mvp_register_portal_account':result=await mvp!.registerAccount(a);break;
+ case'mvp_consent_status':result=await mvp.status();break;
+ case'mvp_check_permission':result=await mvp.permission(a.scope);break;
+ case'mvp_list_applications':result={items:await mvp.applications()};break;
+ case'mvp_prepare_application':result=await mvp.prepare(a,(await c.config('cv'))?.sha256||'');break;
+ case'mvp_record_application_result':result=await mvp.result(a);break;
+ case'mvp_portal_accounts':result={items:await mvp.accounts()};break;
+ case'mvp_register_portal_account':result=await mvp.registerAccount(a);break;
  case'search_contact_database':result=await c.contacts().search(a);break;case'contact_evidence':result=await c.contacts().detail(a.email);break;case'collect_contact_sources':result=await c.contacts().collect(a);break;case'import_contact_candidates':result=await c.contacts().import(a);break;case'search_company_inventory':result=await c.contacts().companies(a);break;case'import_company_inventory':result=await c.contacts().importCompanies(a);break;case'career_status':result=await c.status();break;case'career_context':result=await c.context(a.include_cv===true);break;case'list_outreach':result={items:await c.list()};break;case'inspect_public_source':result=await c.inspectSource(a.url);break;case'company_research_plan':result=c.researchPlan(a.domain);break;case'record_employer':result=await c.recordLead(a);break;case'start_research_run':result=await c.startRun(a.kind);break;case'heartbeat_research_run':result=await c.heartbeat(a.run_id);break;case'record_recipient_feedback':result=await c.feedback(a);break;case'queue_verified_outreach':result=await c.queue(a.packet,a.run_id);break;case'prepare_delivery':result=await c.reserve(a.id);break;case'record_delivery':result=await c.receipt(a);break;case'hold_uncertain_delivery':result=await c.uncertain(a.reservation_token,a.reason);break;case'suppress_contact':result=await c.suppress(a.email,a.reason);break;case'record_reply':result=await c.reply(a.id);break;case'finish_research_run':result=await c.finishRun(a.run_id,a.report);break;default:throw Error('Unknown tool');}
  return Response.json({jsonrpc:'2.0',id:rpc.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}},{headers:{'Cache-Control':'private, no-store'}});
 }catch(error){return Response.json({jsonrpc:'2.0',id:rpc?.id??null,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{headers:{'Cache-Control':'private, no-store'}});}}
