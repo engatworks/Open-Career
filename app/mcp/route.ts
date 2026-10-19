@@ -47,6 +47,17 @@ export async function POST(request:Request){let rpc:any;try{if(Number(request.he
  const c=new Career(env),a=rpc.params?.arguments||{};let result;
  const newNames=new Set(['mvp_consent_status','mvp_check_permission','mvp_list_applications','mvp_prepare_application','mvp_record_application_result','mvp_portal_accounts','mvp_register_portal_account']);
  let mvp;
+ const existingWriteTools=new Set([
+  'collect_contact_sources','import_contact_candidates','import_company_inventory','record_employer',
+  'start_research_run','heartbeat_research_run','record_recipient_feedback','queue_verified_outreach',
+  'prepare_delivery','record_delivery','hold_uncertain_delivery','suppress_contact','record_reply','finish_research_run'
+ ]);
+ if(existingWriteTools.has(rpc.params?.name)){
+  const signedIn=await getChatGPTUser();
+  if(!signedIn?.userId)throw Error('Authenticated owner required for write operations');
+  const permit=new MVPWorkflow(env.DB,signedIn.userId);
+  await permit.assert(rpc.params?.name==='prepare_delivery'?'email:send':'records:write');
+ }
  if(newNames.has(rpc.params?.name)){
   const signedIn=await getChatGPTUser();
   if(!signedIn?.userId)throw Error('Sign in with ChatGPT is required for private MVP application tools');
