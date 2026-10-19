@@ -27,7 +27,7 @@ jobs:
         run: |
           node --check lib/mvp-consent.mjs
           node --check lib/mvp-workflow.mjs
-          node --test tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs
+          node --test tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs tests/private-owner-security.test.mjs
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +63,6 @@ jobs:
 
 
       - name: Run original cloud and MVP integration suites
-        run: node --test tests/cloud.test.mjs tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs
+        run: node --test tests/cloud.test.mjs tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs tests/private-owner-security.test.mjs
       - name: Validate Drizzle migration chain
         run: pnpm exec drizzle-kit check
