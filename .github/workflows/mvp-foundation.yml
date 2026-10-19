@@ -61,3 +61,8 @@ jobs:
           if [ -f /tmp/mvp-tsc.log ]; then cat /tmp/mvp-tsc.log; fi
           exit 1
 
+
+      - name: Run original cloud and MVP integration suites
+        run: node --test tests/cloud.test.mjs tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs
+      - name: Validate Drizzle migration chain
+        run: pnpm exec drizzle-kit check
