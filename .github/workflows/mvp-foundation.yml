@@ -27,3 +27,17 @@ jobs:
           node --check lib/mvp-consent.mjs
           node --check lib/mvp-workflow.mjs
           node --test tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - name: Install pinned dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript verification
+        run: pnpm exec tsc --noEmit
