@@ -1,0 +1,29 @@
+name: Open Career MCP MVP regression
+on:
+  pull_request:
+    paths:
+      - 'lib/mvp-*.mjs'
+      - 'tests/mvp-*.test.mjs'
+      - 'drizzle/0003_mvp_foundation.sql'
+      - 'db/schema.ts'
+      - 'app/mcp/route.ts'
+      - 'app/api/mvp/**'
+      - 'app/consent/**'
+      - '.github/workflows/mvp-foundation.yml'
+  push:
+    branches: [feat/mvp-plugin-authorization-foundation]
+permissions:
+  contents: read
+jobs:
+  mvp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and consent/application tests
+        run: |
+          node --check lib/mvp-consent.mjs
+          node --check lib/mvp-workflow.mjs
+          node --test tests/mvp-consent.test.mjs tests/mvp-workflow.test.mjs
