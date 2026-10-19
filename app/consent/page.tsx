@@ -39,7 +39,7 @@ export default function ConsentPage(){
    <p><strong>Status:</strong> {data.accepted?'Accepted':'Not accepted'} · Terms version {data.termsVersion}</p>
    <details open><summary><strong>Terms and risks — read before continuing</strong></summary>
     <p style={{whiteSpace:'pre-wrap'}}>{data.termsText}</p>
-    <p>This is a working MVP disclosure, not a substitute for the full Terms, Privacy Notice, or professional legal review before public release. No employment outcome is guaranteed.</p>
+    <p>Read the <a href="https://github.com/engatworks/Open-Career/blob/feat/mvp-plugin-authorization-foundation/docs/MVP_TERMS_DRAFT.md" target="_blank" rel="noopener noreferrer">full draft Terms</a> and <a href="https://github.com/engatworks/Open-Career/blob/feat/mvp-plugin-authorization-foundation/docs/MVP_PRIVACY_NOTICE_DRAFT.md" target="_blank" rel="noopener noreferrer">draft Privacy Notice</a>. Both require qualified legal review before public release. No employment outcome is guaranteed.</p>
    </details>
    <h2>Choose permissions</h2>
    {data.availableScopes.map(scope=><label key={scope} style={{display:'block',padding:'10px 0',borderBottom:'1px solid #9995'}}>
