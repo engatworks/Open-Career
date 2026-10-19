@@ -1,38 +1,37 @@
-# Open Career — MCP + skills owner-first MVP architecture
+# Open Career — MCP and skills MVP (owner-first)
 
-**19 Oct 2026. Design/implementation foundation, NOT yet deployed.** The current 0.5.0 app contains a private single-owner outreach tracker with research, contact evidence, Gmail reservations, source checks, quotas and receipts. This branch adds a portable agent skill, scoped consent decision helper and test coverage. It does not yet create portal accounts, submit job forms, or enforce consent in production.
+19 October 2026. Development branch only, NOT deployed. The current main branch is the owner-private 0.5.0 outreach app.
 
-## Operating model
-The user supplies a compatible paid ChatGPT or Claude experience and authorized Gmail/browser capabilities. Open Career is the durable control plane for candidate facts, source evidence, permissions, queues, application state and verified outcomes. There is no mandatory model API. ChatGPT Work tasks can be scheduled within ChatGPT subject to access/usage; there is no documented generic API for a Cloudflare cron to launch those sessions. A remote MCP on Claude does not automatically supply a computer/browser.
+## Implemented
 
-## MVP tools to add
-1. Consent: get_consent_status, accept_terms (via an authenticated human interaction, not an agent clicking for the user), revoke_scopes.
-2. Candidate data: get_candidate_answers, update_candidate_answers (field-level verification).
-3. Vacancies: discover_opportunities, qualify_opportunity (official source URL, dated ATS ID, eligibility).
-4. Execution: reserve_application (per-account/company/job idempotency), record_portal_account (store vault reference NOT secret), record_application_result, mark_requires_user.
-5. Reconciliation: list_action_queue, get_application_history, reconcile_email_and_application_receipts.
+- Portable Open Career skill defining source-backed research, recruiter outreach, applications, and receipt checking.
+- D1 migration 0003 for owner-scoped terms acceptance, grants, applications, and portal account references.
+- User-controlled permissions and revocation UI at /consent with authenticated API at /api/mvp/consent.
+- Application listing and applicant-attested confirmation API at /api/mvp/applications; the separate application history page is not installed.
+- MCP tools: mvp_consent_status, mvp_check_permission, mvp_list_applications, mvp_prepare_application, mvp_record_application_result, mvp_portal_accounts, mvp_register_portal_account.
+- Existing legacy MCP and REST mutations require records:write grants. Reserving an outbound Gmail message requires email:send.
+- Tests for grants, tenants, revocation, applications, duplicate prevention, state transitions, and rejection of plaintext passwords.
+- GitHub Actions regression tests and a full TypeScript check.
 
-Write privileges are checked server-side on every action against the authenticated account, current versioned grant, exact scope, provider authorization, target and quota. An agent's instructions, a tool description or a catch-all user prompt cannot substitute for these checks. Provider restrictions or unknown permissions STOP an action. Never silently retry an ambiguous outbound submission.
+## Operational limits
 
-## Persistent tables needed
-- accepted_terms: account_id, terms_version, accepted_at, locale, immutable text hash, affirmative UI evidence.
-- action_grants: account_id, scope, issued_at, revoked_at, source, bounded limits.
-- candidate_profiles: verified education, work rights, employment, CV fingerprint, answer templates; scoped to owner.
-- employers, contacts, vacancies, opportunities: canonical domain/IDs, sources, observed date, requirements and verification.
-- portal_accounts: owner, site URL, login email, *encrypted per-user vault reference*, verification state; no plaintext credentials.
-- applications: candidate+employer+ATS ID unique key; form attempt/receipt, status, timestamp, CV fingerprint, next action.
-- audit_events, suppression, pending_tasks: actor, exact action, provider outcome, hold reason, deduplication and follow-up.
+The new MCP backend can PREPARE and RECORD applications; it does not browse sites, register real portal accounts, create passwords, enter job forms, pass OTP challenges, click Submit, or verify external application receipts. A provider may require separate human approval. No real job application was submitted by this branch.
 
-A per-user encrypted vault or password manager is required if storing passwords; these portals contain real CVs, identity details and private applicant data. Prefer unique passwords despite convenience. Implement revocation, export, deletion and tenant-isolation before public signups.
+Authentication currently relies on the owner-private managed ChatGPT sign-in integration. The Claude identity adapter is NOT implemented or tested; portability of the SKILL.md does not imply the Claude MCP is ready. The existing private site is a hosting security boundary, not a tested multi-tenant security model.
 
-## State machine
-Discovered -> eligible -> prepared -> reserved -> attempted -> submitted_unverified -> confirmed. Alternate terminal/paused paths: failed, requires_user, withdrawn, suppressed. Confirmed requires a portal confirmation/reference or corroborating message. A click is only attempted; Gmail acceptance is only a send receipt. An unknown result is quarantined and never blindly resent.
+D1 authorization checks control Open Career's database actions, not the independent Gmail or browser privileges granted by an AI host. A version/text change invalidates old consent. An agent report can only record attempted or submitted_unverified; only the applicant can attest a confirmation reference via the private REST API. This is not independent verification by the employer.
 
-## Roadmap
-0.6: clickwrap, consent/grant DB & runtime enforcement, portable MCP skill, normalized applicant and application schema, deterministic tests.
-0.7: ONE supported real ATS/portal supervised application, precise eligibility and receipt verification, private history, existing outbound email integration.
-0.8: bounded scheduled runs, reply triage, safe user account vault and opt-in follow-ups.
-1.0: owner-first real use, documented host compatibility, security review, legal review, beta plugin installation. Only then consider public multi-user service.
+Portal account references contain website hostname and login email only. No password or OTP is accepted or stored. Future credential storage requires an encrypted vault with security review.
 
-## Pilot acceptance test
-A real applicant, one suitable vacancy, verified profile answers, user-authorized browser action, recorded application confirmation or explicit blocked state, no duplicate on second run, and correct export in Open Career. End-to-end real-world test is required; unit tests alone don't prove submissions or background delivery.
+The current draft Terms and Privacy Notice are not final public release terms; identity of the operator, jurisdiction, data retention, export/delete processes, and independent legal review are still required.
+
+## Roadmap and release gates
+
+1. Validate and apply D1 migration through the actual host. Inspect OAuth headers, tenant isolation, Drizzle migration metadata, and identity scope. Do not merge/deploy without these checks.
+2. Build an applicant history screen, verified answer store, and browser/ATS application handoff with evidence.
+3. Complete one real eligible portal application through a supported host, capture the employer confirmation, and re-run to prove no duplication.
+4. Test scheduled Work runs and realistic consumption quotas, including human pause and resume.
+5. Test Claude authorization and separate auth adapter before calling this a cross-host plugin.
+6. Add account data export/deletion, audited encrypted credential vault, legal review and privacy controls before wider user enrollment.
+
+Green unit tests and type checking are software evidence, not proof of successful browser operations or employer responses.
