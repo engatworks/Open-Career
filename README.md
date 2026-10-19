@@ -1,5 +1,12 @@
 # Open Career — cloud edition 0.5.0
 
+## New: Opportunity Fit Lab (experimental)
+
+This feature branch adds a standalone browser-side preview at `/lab`, which checks pasted job descriptions for explicit visa-sponsorship, work-authorization, experience and selected location conditions. It quotes the supplied text, records unknowns rather than guessing, and never contacts employers or stores candidate data. It is **not** a verified vacancy database or immigration adviser. Run `node --test tests/opportunity-fit.test.mjs` for the focused regression suite.
+
+See [the global platform blueprint](docs/PLATFORM_BLUEPRINT.md) before attempting public access. **Do not make the existing owner-private Site or database publicly accessible**; true multi-user accounts need a separate deployment and tenant-isolated storage. This branch has not been publicly deployed.
+
+
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
 The deployed Site provides D1 records, private R2 CV storage, source verification, immutable attachment fingerprints, dedupe, single-run tracking and a rolling 15-send reservation cap. ChatGPT researches original public sources and writes messages. The native Gmail tool receives the exact multipart message returned by the tracker.
