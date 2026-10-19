@@ -65,13 +65,13 @@ export async function POST(request:Request){let rpc:any;try{if(Number(request.he
  }
 
  switch(rpc.params?.name){
- case'mvp_consent_status':result=await mvp.status();break;
- case'mvp_check_permission':result=await mvp.permission(a.scope);break;
- case'mvp_list_applications':result={items:await mvp.applications()};break;
- case'mvp_prepare_application':result=await mvp.prepare(a,(await c.config('cv'))?.sha256||'');break;
- case'mvp_record_application_result':result=await mvp.result(a);break;
- case'mvp_portal_accounts':result={items:await mvp.accounts()};break;
- case'mvp_register_portal_account':result=await mvp.registerAccount(a);break;
+ case'mvp_consent_status':result=await mvp!.status();break;
+ case'mvp_check_permission':result=await mvp!.permission(a.scope);break;
+ case'mvp_list_applications':result={items:await mvp!.applications()};break;
+ case'mvp_prepare_application':result=await mvp!.prepare(a,(await c.config('cv'))?.sha256||'');break;
+ case'mvp_record_application_result':result=await mvp!.result(a);break;
+ case'mvp_portal_accounts':result={items:await mvp!.accounts()};break;
+ case'mvp_register_portal_account':result=await mvp!.registerAccount(a);break;
  case'search_contact_database':result=await c.contacts().search(a);break;case'contact_evidence':result=await c.contacts().detail(a.email);break;case'collect_contact_sources':result=await c.contacts().collect(a);break;case'import_contact_candidates':result=await c.contacts().import(a);break;case'search_company_inventory':result=await c.contacts().companies(a);break;case'import_company_inventory':result=await c.contacts().importCompanies(a);break;case'career_status':result=await c.status();break;case'career_context':result=await c.context(a.include_cv===true);break;case'list_outreach':result={items:await c.list()};break;case'inspect_public_source':result=await c.inspectSource(a.url);break;case'company_research_plan':result=c.researchPlan(a.domain);break;case'record_employer':result=await c.recordLead(a);break;case'start_research_run':result=await c.startRun(a.kind);break;case'heartbeat_research_run':result=await c.heartbeat(a.run_id);break;case'record_recipient_feedback':result=await c.feedback(a);break;case'queue_verified_outreach':result=await c.queue(a.packet,a.run_id);break;case'prepare_delivery':result=await c.reserve(a.id);break;case'record_delivery':result=await c.receipt(a);break;case'hold_uncertain_delivery':result=await c.uncertain(a.reservation_token,a.reason);break;case'suppress_contact':result=await c.suppress(a.email,a.reason);break;case'record_reply':result=await c.reply(a.id);break;case'finish_research_run':result=await c.finishRun(a.run_id,a.report);break;default:throw Error('Unknown tool');}
  return Response.json({jsonrpc:'2.0',id:rpc.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}},{headers:{'Cache-Control':'private, no-store'}});
 }catch(error){return Response.json({jsonrpc:'2.0',id:rpc?.id??null,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{headers:{'Cache-Control':'private, no-store'}});}}
