@@ -1,9 +1,19 @@
 import { env } from 'cloudflare:workers';
 import { Career } from '@/lib/career.mjs';
+import { MVPWorkflow } from '@/lib/mvp-workflow.mjs';
+import { getChatGPTUser } from '@/app/chatgpt-auth';
 export const dynamic='force-dynamic';
 const object=(properties:Record<string,unknown>,required:string[]=[])=>({type:'object',properties,required,additionalProperties:false});
 const str={type:'string'};
 const tools=[
+ {name:'mvp_consent_status',description:'Read your personal Open Career consent and versioned terms. Only signed-in owner can access.',inputSchema:object({}),annotations:{readOnlyHint:true}},
+ {name:'mvp_check_permission',description:'Check a specific Open Career scope before acting; this does NOT grant external Gmail/browser privileges.',inputSchema:object({scope:str},['scope']),annotations:{readOnlyHint:true}},
+ {name:'mvp_list_applications',description:'Read your private job applications and evidence. Requires research:read consent.',inputSchema:object({}),annotations:{readOnlyHint:true}},
+ {name:'mvp_prepare_application',description:'Idempotently prepare a job application; DOES NOT open websites or submit. Requires applications:prepare consent and current CV.',inputSchema:object({companyDomain:str,atsJobId:str,vacancyUrl:str,positionTitle:str},['companyDomain','vacancyUrl','positionTitle'])},
+ {name:'mvp_record_application_result',description:'Record only ATTEMPTED, SUBMITTED_UNVERIFIED, REQUIRES_USER or FAILED; no self-declared confirmation. Requires action scope.',inputSchema:object({id:str,state:{type:'string',enum:['attempted','submitted_unverified','requires_user','failed']},evidence:{type:'object'}},['id','state'])},
+ {name:'mvp_portal_accounts',description:'List portal account references. No passwords are stored. Requires research:read consent.',inputSchema:object({}),annotations:{readOnlyHint:true}},
+ {name:'mvp_register_portal_account',description:'Record an externally CREATED portal account reference. Does not create login or accept passwords. Requires accounts:create consent.',inputSchema:object({portalUrl:str,loginEmail:str},['portalUrl','loginEmail'])},
+
  {name:'search_contact_database',description:'Search durable contact candidates. Imported names are claims; no result grants delivery eligibility.',inputSchema:object({q:str,domain:str,kind:str,offset:{type:'integer'},limit:{type:'integer'}}),annotations:{readOnlyHint:true}},
  {name:'contact_evidence',description:'Read original/provider observations for one contact and review identity conflicts.',inputSchema:object({email:str},['email']),annotations:{readOnlyHint:true}},
  {name:'collect_contact_sources',description:'Collect exact published email candidates from up to five selected public pages, respecting robots and limits. Saves source contexts; does not send or infer identities.',inputSchema:object({urls:{type:'array',items:str,maxItems:5,minItems:1}},['urls'])},
@@ -35,6 +45,22 @@ export async function POST(request:Request){let rpc:any;try{if(Number(request.he
  if(rpc.method==='notifications/initialized')return new Response(null,{status:202});
  if(rpc.method!=='tools/call')throw Error('Unknown method');
  const c=new Career(env),a=rpc.params?.arguments||{};let result;
- switch(rpc.params?.name){case'search_contact_database':result=await c.contacts().search(a);break;case'contact_evidence':result=await c.contacts().detail(a.email);break;case'collect_contact_sources':result=await c.contacts().collect(a);break;case'import_contact_candidates':result=await c.contacts().import(a);break;case'search_company_inventory':result=await c.contacts().companies(a);break;case'import_company_inventory':result=await c.contacts().importCompanies(a);break;case'career_status':result=await c.status();break;case'career_context':result=await c.context(a.include_cv===true);break;case'list_outreach':result={items:await c.list()};break;case'inspect_public_source':result=await c.inspectSource(a.url);break;case'company_research_plan':result=c.researchPlan(a.domain);break;case'record_employer':result=await c.recordLead(a);break;case'start_research_run':result=await c.startRun(a.kind);break;case'heartbeat_research_run':result=await c.heartbeat(a.run_id);break;case'record_recipient_feedback':result=await c.feedback(a);break;case'queue_verified_outreach':result=await c.queue(a.packet,a.run_id);break;case'prepare_delivery':result=await c.reserve(a.id);break;case'record_delivery':result=await c.receipt(a);break;case'hold_uncertain_delivery':result=await c.uncertain(a.reservation_token,a.reason);break;case'suppress_contact':result=await c.suppress(a.email,a.reason);break;case'record_reply':result=await c.reply(a.id);break;case'finish_research_run':result=await c.finishRun(a.run_id,a.report);break;default:throw Error('Unknown tool');}
+ const newNames=new Set(['mvp_consent_status','mvp_check_permission','mvp_list_applications','mvp_prepare_application','mvp_record_application_result','mvp_portal_accounts','mvp_register_portal_account']);
+ let mvp;
+ if(newNames.has(rpc.params?.name)){
+  const signedIn=await getChatGPTUser();
+  if(!signedIn?.userId)throw Error('Sign in with ChatGPT is required for private MVP application tools');
+  mvp=new MVPWorkflow(env.DB,signedIn.userId);
+ }
+
+ switch(rpc.params?.name){
+ case'mvp_consent_status':result=await mvp.status();break;
+ case'mvp_check_permission':result=await mvp.permission(a.scope);break;
+ case'mvp_list_applications':result={items:await mvp.applications()};break;
+ case'mvp_prepare_application':result=await mvp.prepare(a,(await c.config('cv'))?.sha256||'');break;
+ case'mvp_record_application_result':result=await mvp.result(a);break;
+ case'mvp_portal_accounts':result={items:await mvp.accounts()};break;
+ case'mvp_register_portal_account':result=await mvp.registerAccount(a);break;
+ case'search_contact_database':result=await c.contacts().search(a);break;case'contact_evidence':result=await c.contacts().detail(a.email);break;case'collect_contact_sources':result=await c.contacts().collect(a);break;case'import_contact_candidates':result=await c.contacts().import(a);break;case'search_company_inventory':result=await c.contacts().companies(a);break;case'import_company_inventory':result=await c.contacts().importCompanies(a);break;case'career_status':result=await c.status();break;case'career_context':result=await c.context(a.include_cv===true);break;case'list_outreach':result={items:await c.list()};break;case'inspect_public_source':result=await c.inspectSource(a.url);break;case'company_research_plan':result=c.researchPlan(a.domain);break;case'record_employer':result=await c.recordLead(a);break;case'start_research_run':result=await c.startRun(a.kind);break;case'heartbeat_research_run':result=await c.heartbeat(a.run_id);break;case'record_recipient_feedback':result=await c.feedback(a);break;case'queue_verified_outreach':result=await c.queue(a.packet,a.run_id);break;case'prepare_delivery':result=await c.reserve(a.id);break;case'record_delivery':result=await c.receipt(a);break;case'hold_uncertain_delivery':result=await c.uncertain(a.reservation_token,a.reason);break;case'suppress_contact':result=await c.suppress(a.email,a.reason);break;case'record_reply':result=await c.reply(a.id);break;case'finish_research_run':result=await c.finishRun(a.run_id,a.report);break;default:throw Error('Unknown tool');}
  return Response.json({jsonrpc:'2.0',id:rpc.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}},{headers:{'Cache-Control':'private, no-store'}});
 }catch(error){return Response.json({jsonrpc:'2.0',id:rpc?.id??null,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{headers:{'Cache-Control':'private, no-store'}});}}
