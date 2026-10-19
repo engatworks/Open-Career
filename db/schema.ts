@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const configuration = sqliteTable('configuration', {key:text('key').primaryKey(),value:text('value').notNull(),revision:integer('revision').notNull().default(0)});
 export const outreach = sqliteTable('outreach', {
@@ -33,3 +33,27 @@ export const companyInventory=sqliteTable('company_inventory',{
  domain:text('domain').primaryKey(),name:text('name').notNull(),industry:text('industry').notNull().default(''),location:text('location').notNull().default(''),
  provider:text('provider').notNull(),source_url:text('source_url').notNull(),attribution:text('attribution').notNull().default(''),updated_at:text('updated_at').notNull(),
 });
+
+
+// Owner-scoped MCP application MVP (migration 0003).
+export const mvpAcceptances=sqliteTable('mvp_acceptances',{
+ account_id:text('account_id').primaryKey(),terms_version:text('terms_version').notNull(),
+ terms_hash:text('terms_hash').notNull(),accepted_at:text('accepted_at').notNull(),revoked_at:text('revoked_at'),
+});
+export const mvpGrants=sqliteTable('mvp_grants',{
+ account_id:text('account_id').notNull(),scope:text('scope').notNull(),
+ granted_at:text('granted_at').notNull(),revoked_at:text('revoked_at'),
+},t=>[primaryKey({columns:[t.account_id,t.scope]})]);
+export const mvpApplications=sqliteTable('mvp_applications',{
+ id:text('id').primaryKey(),account_id:text('account_id').notNull(),
+ company_domain:text('company_domain').notNull(),ats_job_id:text('ats_job_id').notNull(),
+ vacancy_url:text('vacancy_url').notNull(),position_title:text('position_title').notNull(),
+ state:text('state').notNull().default('prepared'),cv_hash:text('cv_hash').notNull(),
+ evidence:text('evidence').notNull().default('{}'),created_at:text('created_at').notNull(),
+ updated_at:text('updated_at').notNull(),
+},t=>[index('mvp_applications_owner_updated').on(t.account_id,t.updated_at)]);
+export const mvpPortalAccounts=sqliteTable('mvp_portal_accounts',{
+ id:text('id').primaryKey(),account_id:text('account_id').notNull(),
+ site_host:text('site_host').notNull(),login_email:text('login_email').notNull(),
+ created_at:text('created_at').notNull(),updated_at:text('updated_at').notNull(),
+},t=>[uniqueIndex('mvp_portal_owner_login').on(t.account_id,t.site_host,t.login_email),index('mvp_portal_owner').on(t.account_id)]);
