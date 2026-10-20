@@ -1,8 +1,8 @@
-# Open Career — cloud edition 0.5.0
+# Open Career — cloud edition 0.5.1
 
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
-The deployed Site provides D1 records, private R2 CV storage, source verification, immutable attachment fingerprints, dedupe, single-run tracking and a rolling 15-send reservation cap. ChatGPT researches original public sources and writes messages. The native Gmail tool receives the exact multipart message returned by the tracker.
+The deployed Site provides D1 records, private R2 CV storage, source verification, immutable attachment fingerprints, dedupe, single-run tracking and a 25-send Riyadh calendar-day reservation cap. ChatGPT researches original public sources and writes messages. The native Gmail tool receives the exact multipart message returned by the tracker.
 
 ## Important operational distinction
 
@@ -13,7 +13,7 @@ The site is owner-private and relies on platform authentication. Its native MCP 
 ## Cloud workflow
 
 1. Retrieve `/api/agent-context` and outreach history, or use the private MCP tools.
-2. Claim a research run; use the discovery pool to deeply research 10–15 Saudi employers of all sizes, prioritizing relevant named people.
+2. Claim a research run; use the discovery pool to deeply research up to 25 Saudi employers of all sizes, prioritizing relevant named people.
 3. Record actual company/person/project sources, published named-person work email or explicit official careers-inbox invitation, contact role and candidate evidence. Preserve supervised scope. Reject ineligible vacancies, then separately consider an honest speculative paid-junior referral inquiry. No advertised vacancy or job-board account is required. Careers inboxes require a documented named-person search first.
 4. Submit packets through `queue_verified_outreach`; the tracker independently re-fetches cited quotations and freezes CV/profile state.
 5. `prepare_delivery` atomically reserves one contact and a quota slot, returning an exact Gmail MIME tree with CV.pdf.
