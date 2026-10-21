@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import {authenticate,IdentityError,clearKeyCacheForTests} from '../lib/tenant-identity.mjs';
 import {TenantWorkspace} from '../lib/tenant-workspace.mjs';
 import {purgeDeletingTenant,reconcileDeletingAccounts} from '../lib/tenant-purge.mjs';
+import {encryptCV,decryptCV,encryptedCVKeyId,activeCVKeyId} from '../lib/cv-crypto.mjs';
 const b64=x=>Buffer.from(x).toString('base64url');
 const secret=b64(crypto.getRandomValues(new Uint8Array(32)));
 const encryption=b64(crypto.getRandomValues(new Uint8Array(32)));
@@ -218,4 +219,50 @@ test('Oversized tenant object namespaces are purged incrementally without deleti
  assert.equal((await reconcileDeletingAccounts(env)).completed,1);
  assert.equal(env.BUCKET.objects.size,0);
  assert.equal(env.sqlite.prepare('SELECT COUNT(*) n FROM tenant_accounts WHERE id=?').get(owner.id).n,0);
+});
+
+test('OCV2 encrypts under explicitly versioned keys with tenant-bound authenticated data',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('keyring-a')),b=new TenantWorkspace(env,await principal('keyring-b'));
+ await a.onboard();await b.onboard();
+ const old=Buffer.alloc(32,41).toString('base64url'),newkey=Buffer.alloc(32,42).toString('base64url');
+ env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'oct26',keys:{oct26:old}});
+ assert.equal(activeCVKeyId(env),'oct26');
+ await a.uploadCV(cv);
+ const arow=env.sqlite.prepare("SELECT storage_key FROM tenant_documents WHERE tenant_id=?").get(a.id);
+ const blob=env.BUCKET.objects.get(arow.storage_key);
+ assert.equal(encryptedCVKeyId(blob),'oct26');
+ assert.deepEqual(Buffer.from((await a.readCV()).bytes),Buffer.from(cv));
+ await assert.rejects(decryptCV(blob,env,b.id),/operation|decrypt|authentication/i);
+ await assert.rejects(decryptCV(blob,{...env,OPENCAREER_CV_KEYRING:JSON.stringify({active:'nov26',keys:{nov26:newkey}})},a.id),/unavailable/);
+ env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'nov26',keys:{oct26:old,nov26:newkey}});
+ assert.equal((await a.rotateCVKey()).rotated,true);
+ assert.equal((await a.rotateCVKey()).rotated,false);
+ const row=env.sqlite.prepare("SELECT storage_key FROM tenant_documents WHERE tenant_id=?").get(a.id);
+ assert.equal(encryptedCVKeyId(env.BUCKET.objects.get(row.storage_key)),'nov26');
+ assert.deepEqual(Buffer.from((await a.readCV()).bytes),Buffer.from(cv));
+ env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'nov26',keys:{nov26:newkey}});
+ assert.deepEqual(Buffer.from((await a.readCV()).bytes),Buffer.from(cv));
+ assert.equal(env.BUCKET.objects.size,1);
+});
+test('Existing legacy encrypted PDFs migrate safely to OCV2 without plaintext persisted',async()=>{
+ const env=storage(),w=new TenantWorkspace(env,await principal('keyring-legacy'));
+ await w.onboard();await w.uploadCV(cv);
+ const row=env.sqlite.prepare("SELECT storage_key FROM tenant_documents WHERE tenant_id=?").get(w.id);
+ assert.equal(encryptedCVKeyId(env.BUCKET.objects.get(row.storage_key)),null);
+ const key=Buffer.alloc(32,36).toString('base64url');
+ env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'initial',keys:{initial:key}});
+ assert.deepEqual(Buffer.from((await w.readCV()).bytes),Buffer.from(cv));
+ assert.equal((await w.rotateCVKey()).rotated,true);
+ const next=env.sqlite.prepare("SELECT storage_key FROM tenant_documents WHERE tenant_id=?").get(w.id);
+ assert.equal(encryptedCVKeyId(env.BUCKET.objects.get(next.storage_key)),'initial');
+ assert.equal(env.BUCKET.objects.size,1);
+});
+test('Misconfigured CV ring fails closed instead of silently reverting to legacy key',async()=>{
+ const env=storage(),w=new TenantWorkspace(env,await principal('keyring-fail'));
+ await w.onboard();
+ env.OPENCAREER_CV_KEYRING='not-json';
+ await assert.rejects(w.uploadCV(cv),/keyring JSON/);
+ env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'a',keys:{a:env.OPENCAREER_CV_ENCRYPTION_KEY}});
+ await assert.rejects(w.uploadCV(cv),/must differ/);
+ assert.equal(env.BUCKET.objects.size,0);
 });
