@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { Career } from '@/lib/career.mjs';
+import { discoverATSJobs } from '@/lib/ats-discovery.mjs';
 export const dynamic='force-dynamic';
 
 function response(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});}
@@ -7,6 +8,7 @@ async function bounded(request:Request,limit=200000){const reader=request.body?.
 async function json(request:Request){return JSON.parse(new TextDecoder().decode(await bounded(request)));}
 async function handler(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const career=new Career(env);
  if(method==='GET'){
+  if(path==='ats/jobs')return response(await discoverATSJobs({provider:url.searchParams.get('provider'),board:url.searchParams.get('board'),region:url.searchParams.get('region')||'global',query:url.searchParams.get('q')||'',limit:Number(url.searchParams.get('limit')||50)}));
   if(path==='companies')return response(await career.contacts().companies(Object.fromEntries(url.searchParams)));
   if(path==='contacts')return response(await career.contacts().search(Object.fromEntries(url.searchParams)));
   if(path==='contacts/stats')return response(await career.contacts().stats());

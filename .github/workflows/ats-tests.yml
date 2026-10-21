@@ -1,0 +1,39 @@
+name: ATS foundation tests
+
+on:
+  pull_request:
+    paths:
+      - 'lib/ats-discovery.mjs'
+      - 'lib/application-ledger.mjs'
+      - 'tests/ats.test.mjs'
+      - 'drizzle/0003_ats_applications.sql'
+      - '.github/workflows/ats-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/ats-discovery.mjs'
+      - 'lib/application-ledger.mjs'
+      - 'tests/ats.test.mjs'
+      - 'drizzle/0003_ats_applications.sql'
+      - '.github/workflows/ats-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ats-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Test ATS discovery and tenant application ledger
+        run: node --test tests/ats.test.mjs
+      - name: Install project dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run existing cloud regression suite
+        run: node --test tests/cloud.test.mjs
+      - name: Type-check the full application
+        run: node node_modules/typescript/bin/tsc --noEmit
