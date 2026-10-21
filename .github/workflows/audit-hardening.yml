@@ -1,0 +1,43 @@
+name: Senior release audit and fault-injection suite
+
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'app/join/**'
+      - 'tests/**'
+      - '.github/workflows/audit-hardening.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'app/join/**'
+      - 'tests/**'
+      - '.github/workflows/audit-hardening.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Install dependencies without executing third-party install scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: New fault-injection and all existing regression tests
+        run: node --test tests/*.test.mjs
+      - name: Ensure schema migrations are ordered and valid
+        run: node node_modules/drizzle-kit/bin.cjs check
+      - name: Typecheck complete source and React UI
+        run: node node_modules/typescript/bin/tsc --noEmit
+      - name: Compile production project, not just isolated TypeScript files
+        run: corepack pnpm build
