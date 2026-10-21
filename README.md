@@ -103,3 +103,11 @@ The latest changes introduce concurrent-CV compare-and-swap semantics, resumable
 The source now uses patched Next.js, React Server Components and related runtime/build dependencies. The pnpm lockfile is regenerated and the production high/critical advisory check is a mandatory CI gate. One **unpatched dev-only transitive advisory in `braces`** remains tracked as [issue #12](https://github.com/engatworks/Open-Career/issues/12), without independent risk acceptance. Do not state that the product is vulnerability-free.
 
 **No public/commercial launch:** a real, segregated staging deployment, OIDC provider setup, independent security review, complete export/data lifecycle, contractual/privacy review, billing and supported portal submission evidence are not yet delivered. Keep the legacy owner workspace private, and do not interpret GitHub CI success as actual customer-data security certification.
+
+## Candidate data lifecycle safeguards (pre-release)
+
+The multi-user source now supports [versioned OCV2 CV encryption and rotation](docs/DATA_LIFECYCLE_AND_KEY_ROTATION.md) while preserving existing OCV1 ciphertext; tenant-owned paginated data exports; browser-session inventory, selective revocation and sign-out-everywhere; and optional, strictly age-gated R2 orphan cleanup with expired session/transaction housekeeping.
+
+These capabilities require a **real versioned keyring stored in hosting secrets**, the additive D1 migration `0008_lifecycle_maintenance`, and a trusted separately deployed scheduler for garbage collection. No real user CVs have been bulk re-encrypted, deleted, exported or moved by these source changes. The old `/api/v2/export` endpoint is retained only as a **partial** legacy export, and a live-data export is explicitly **not** an atomic multi-table snapshot.
+
+Before commercial registrations or customer billing: validate OIDC, actual Cloudflare D1/R2 behavior, backups/key custody, complete privacy-retention workflows, independent security assessment and support operations. Review the [senior engineering audit](docs/SENIOR_ENGINEERING_AUDIT_2026-10-21.md) and [commercial beta gates](docs/COMMERCIAL_BETA_GATES.md).

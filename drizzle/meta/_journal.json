@@ -57,6 +57,13 @@
       "when": 1792597500000,
       "tag": "0007_job_watchlists",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792602600000,
+      "tag": "0008_lifecycle_maintenance",
+      "breakpoints": true
     }
   ]
 }

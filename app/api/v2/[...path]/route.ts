@@ -3,6 +3,8 @@ import {env} from 'cloudflare:workers';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
+import {TenantExport} from '@/lib/tenant-export.mjs';
+import {activeCVKeyId} from '@/lib/cv-crypto.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
 import {BoardWatch} from '@/lib/board-watch.mjs';
 import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
@@ -71,6 +73,15 @@ async function handle(request:Request){
   if(request.method==='GET'&&path==='profile')return respond({profile:await workspace.profile()});
   if(request.method==='POST'&&path==='profile')return respond({profile:await workspace.setProfile(await json(request))});
   if(request.method==='GET'&&path==='cv/info')return respond({cv:await workspace.cvInfo()});
+  if(request.method==='GET'&&path==='cv/key-status'){
+   await workspace.account();
+   const current=activeCVKeyId(env);
+   return respond({versioned_encryption_available:!!current,key_id:current});
+  }
+  if(request.method==='POST'&&path==='cv/rekey'){
+   await throttleTenant(env,identity,'cv_rekey',8,{intervalSeconds:3600});
+   return respond(await workspace.rotateCVKey());
+  }
   if(request.method==='POST'&&path==='cv')return respond({cv:await workspace.uploadCV(await bounded(request,5_000_000))},201);
   if(request.method==='GET'&&path==='cv'){
    const {bytes,sha256}=await workspace.readCV();
@@ -91,7 +102,23 @@ async function handle(request:Request){
    return respond({application:await(await workspace.applications()).approve(input.id,input)});
   }
   if(request.method==='POST'&&path==='applications/cancel'){const input=await json(request);return respond({application:await(await workspace.applications()).cancel(input.id)});}
-  if(request.method==='GET'&&path==='export')return Response.json(await workspace.exportData(),{headers:{...headers,'Content-Disposition':'attachment; filename="open-career-export.json"'}});
+  if(request.method==='GET'&&path==='export/manifest'){
+   await throttleTenant(env,identity,'export_read',120,{intervalSeconds:3600});
+   return respond(await(new TenantExport(workspace)).manifest());
+  }
+  if(request.method==='GET'&&path==='export/page'){
+   await throttleTenant(env,identity,'export_read',120,{intervalSeconds:3600});
+   return respond(await(new TenantExport(workspace)).page({
+    collection:url.searchParams.get('collection'),
+    cursor:url.searchParams.get('cursor'),
+    limit:Number(url.searchParams.get('limit')||100)
+   }));
+  }
+  // Deprecated one-shot export is retained for compatible clients but is explicitly partial.
+  if(request.method==='GET'&&path==='export')
+   return Response.json({...await workspace.exportData(),partial:true,
+    notice:'This legacy download has fixed row limits. Use /export/manifest and /export/page to retrieve all records; download the CV PDF separately.'},
+    {headers:{...headers,'Content-Disposition':'attachment; filename="open-career-partial-export.json"'}});
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){
