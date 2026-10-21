@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import styles from './join.module.css';
 
 type Session={tenant_id:string;name:string|null;email:string|null;csrf:string;signed_in:boolean};
-type Profile={name:string;headline:string;target_roles:string[];preferred_locations:string[];languages:string[];work_authorization:string;evidence:{id:string;claim:string}[];custom_fields:Record<string,string>};
+type Profile={name:string;headline:string;target_roles:string[];preferred_locations:string[];languages:string[];work_authorization:string;evidence:{id:string;claim:string}[];custom_fields:Record<string,string>;revision?:number};
 type Job={job_key:string;provider:string;board:string;job_id:string;title:string;location:string;apply_url:string;source_checked_at:string};
 type Saved={id:string;job_key:string;title:string;status:string;apply_url:string;created_at:string};
 type WatchedBoard={id:string;provider:string;board:string;region:string;label:string;last_success_at:string|null;last_error:string|null;new_count:number;auto_scan:number};
@@ -85,8 +85,9 @@ export default function JoinClient(){
  }
  async function saveProfile(){await action(async()=>{
   if(!session)return;
-  const info:Profile={...profile,name:profile.name.trim(),headline:profile.headline.trim(),target_roles:split(roles),preferred_locations:split(locations),languages:split(languages),evidence:evidence.split('\n').map((claim,i)=>({id:'fact-'+(i+1),claim:claim.trim()})).filter(x=>x.claim),custom_fields:profile.custom_fields||{}};
-  await api('/api/v2/profile',{method:'POST',body:JSON.stringify(info)});setProfile(info);setMessage('Your candidate profile was saved to your private workspace.');
+  const info:Profile={name:profile.name.trim(),headline:profile.headline.trim(),target_roles:split(roles),preferred_locations:split(locations),languages:split(languages),work_authorization:profile.work_authorization.trim(),evidence:evidence.split('\\n').map((claim,i)=>({id:'fact-'+(i+1),claim:claim.trim()})).filter(x=>x.claim),custom_fields:profile.custom_fields||{}};
+  const result=await api('/api/v2/profile',{method:'POST',body:JSON.stringify({...info,expected_revision:profile.revision??0})});
+  setProfile({...info,revision:result.profile.revision});setMessage('Your candidate profile was saved to your private workspace.');
  });}
  async function upload(file:File|undefined){if(!file)return;await action(async()=>{
   if(file.size>5_000_000||(file.type&&file.type!=='application/pdf'))throw Error('Choose a PDF smaller than 5 MB.');
@@ -98,7 +99,8 @@ export default function JoinClient(){
   if(!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(board))throw Error('Enter a valid employer board slug.');
   const url='/api/v2/ats/jobs?'+new URLSearchParams({provider,board,q:query,limit:'50'});
   const result=await api(url);setJobs(result.jobs||[]);setDiscoveryAt(result.checked_at);
-  if(!result.jobs?.length)setMessage('No matching jobs were returned from this public board.');
+  if(result.partial_results)setMessage('Results are limited to '+result.returned+' of '+result.matched_total+' matching published jobs. Narrow the search for more complete results.');
+  else if(!result.jobs?.length)setMessage('No matching jobs were returned from this public board.');
  });}
  async function saveBoard(){await action(async()=>{
   const result=await api('/api/v2/boards',{method:'POST',body:JSON.stringify({provider,board,region:'global',label:boardLabel})});
@@ -108,7 +110,7 @@ export default function JoinClient(){
   const result=await api('/api/v2/boards/scan',{method:'POST',body:JSON.stringify({id})});
   const [wb,oj]=await Promise.all([api('/api/v2/boards'),api('/api/v2/listings?status=new')]);
   setBoards(wb.items);setNewJobs(oj.items);
-  setMessage(result.baseline?'Baseline saved: '+result.found+' public listings. Future scans will highlight new ones.':result.newly_detected+' newly detected listings out of '+result.found+' checked.');
+  setMessage(result.partial_results?'Partial feed: the search limit was reached. These listings are only a subset; review the official board for complete coverage.':result.baseline?'Baseline saved: '+result.found+' public listings. Future scans will highlight newly observed jobs.':result.newly_detected+' newly observed jobs out of '+result.found+' checked.');
  });}
  async function toggleAutoScan(b:WatchedBoard){await action(async()=>{
   await api('/api/v2/boards/auto',{method:'POST',body:JSON.stringify({id:b.id,enabled:!b.auto_scan})});

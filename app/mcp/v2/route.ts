@@ -1,3 +1,4 @@
+import {publicFailure} from '@/lib/public-errors.mjs';
 import {env} from 'cloudflare:workers';
 import {authenticate,IdentityError} from '@/lib/tenant-identity.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
@@ -11,7 +12,7 @@ const tools=[
  {name:'workspace_account',description:'Read current authenticated identity registration and tenant workspace status.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'onboard_workspace',description:'Provision a workspace exclusively for the verified OIDC bearer identity.',inputSchema:object({})},
  {name:'get_candidate_profile',description:'Read your own approved candidate profile. No cross-user profile access.',inputSchema:object({}),annotations:{readOnlyHint:true}},
- {name:'save_candidate_profile',description:'Save your own profile and approved factual evidence. Never invent credentials, experience or work authorization.',inputSchema:object({profile:{type:'object'}},['profile'])},
+ {name:'save_candidate_profile',description:'Save your candidate profile after fetching its current revision. Include expected_revision=0 only for first creation, or the exact current revision for updates. A stale revision is rejected; never invent credentials or employment evidence.',inputSchema:object({profile:{type:'object'},expected_revision:{type:'integer',minimum:0}},['profile','expected_revision'])},
  {name:'cv_attachment_status',description:'Read your own encrypted CV fingerprint and size, but not the private file.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'my_contacts',description:'List only the authenticated user contact candidates. These are not eligible for automatic sending.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'add_contact_candidate',description:'Save one explicitly sourced, unverified professional contact within your own workspace.',inputSchema:object({email:str,name:str,company:str,role:str,source_url:str},['email'])},
@@ -56,7 +57,7 @@ export async function POST(request:Request){
     await assertOnboardingAllowed(env,identity);
     result=await workspace.onboard();break;
    case 'get_candidate_profile':result=await workspace.profile();break;
-   case 'save_candidate_profile':result=await workspace.setProfile(a.profile);break;
+   case 'save_candidate_profile':result=await workspace.setProfile({...a.profile,expected_revision:a.expected_revision});break;
    case 'cv_attachment_status':result=await workspace.cvInfo();break;
    case 'my_contacts':result={items:await workspace.contacts()};break;
    case 'add_contact_candidate':result=await workspace.addContact(a);break;
@@ -86,7 +87,7 @@ export async function POST(request:Request){
   }
   return out(id,result);
  }catch(error){
-  const status=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:400;
-  return Response.json({jsonrpc:'2.0',id,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{status,headers:{'Cache-Control':'private, no-store'}});
+  const failure=publicFailure(error);
+  return Response.json({jsonrpc:'2.0',id,result:{content:[{type:'text',text:failure.message}],isError:true}},{status:failure.status,headers:{'Cache-Control':'private, no-store'}});
  }
 }

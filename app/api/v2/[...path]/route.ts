@@ -1,3 +1,4 @@
+import {publicFailure} from '@/lib/public-errors.mjs';
 import {env} from 'cloudflare:workers';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
@@ -94,9 +95,8 @@ async function handle(request:Request){
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){
-  const status=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:error instanceof SyntaxError?400:
-   error instanceof Error&&/not provisioned|inactive/.test(error.message)?403:400;
-  return respond({error:error instanceof Error?error.message:'Request failed'},status);
+  const failure=publicFailure(error);
+  return respond({error:failure.message},failure.status);
  }
 }
 export const GET=handle;export const POST=handle;export const DELETE=handle;

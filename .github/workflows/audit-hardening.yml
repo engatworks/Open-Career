@@ -1,0 +1,54 @@
+name: Senior release audit and fault-injection suite
+
+on:
+  schedule:
+    - cron: '23 07 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'app/join/**'
+      - 'tests/**'
+      - '.github/workflows/audit-hardening.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'app/join/**'
+      - 'tests/**'
+      - '.github/workflows/audit-hardening.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Install dependencies without executing third-party install scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: New fault-injection and all existing regression tests
+        run: node --test tests/*.test.mjs
+      - name: Ensure schema migrations are ordered and valid
+        run: node node_modules/drizzle-kit/bin.cjs check
+      - name: Typecheck complete source and React UI
+        run: node node_modules/typescript/bin/tsc --noEmit
+      - name: Report remaining low and moderate dependency advisories for triage
+        continue-on-error: true
+        run: corepack pnpm audit --prod --audit-level low
+      - name: Check production dependencies for high and critical advisories
+        run: corepack pnpm audit --prod --audit-level high
+      - name: Report build/development high-severity advisories (unpatched braces tracked in issue 12)
+        continue-on-error: true
+        run: corepack pnpm audit --dev --audit-level high
+      - name: Compile production project, not just isolated TypeScript files
+        run: corepack pnpm build

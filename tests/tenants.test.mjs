@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {authenticate,IdentityError,clearKeyCacheForTests} from '../lib/tenant-identity.mjs';
 import {TenantWorkspace} from '../lib/tenant-workspace.mjs';
+import {purgeDeletingTenant,reconcileDeletingAccounts} from '../lib/tenant-purge.mjs';
 const b64=x=>Buffer.from(x).toString('base64url');
 const secret=b64(crypto.getRandomValues(new Uint8Array(32)));
 const encryption=b64(crypto.getRandomValues(new Uint8Array(32)));
@@ -35,6 +36,12 @@ function storage(){
   async put(k,bytes){this.objects.set(k,new Uint8Array(bytes));}
   async get(k){const data=this.objects.get(k);return data?{arrayBuffer:async()=>data.slice().buffer}:null;}
   async delete(k){this.objects.delete(k);}
+  async list({prefix,limit=100,cursor}={}){
+   const keys=[...this.objects.keys()].filter(k=>k.startsWith(prefix||'')).sort();
+   const start=cursor?keys.findIndex(k=>k===cursor)+1:0;
+   const page=keys.slice(start,start+limit);
+   return {objects:page.map(key=>({key})),truncated:start+limit<keys.length,cursor:start+limit<keys.length?page[page.length-1]:undefined};
+  }
  }
  const BUCKET=new R2();
  return {...config,DB,BUCKET,sqlite};
@@ -115,9 +122,100 @@ test('One user deletion leaves all other user data and CV untouched',async()=>{
  await a.addContact({email:'private@example.com'});await b.addContact({email:'private@example.com'});
  await(await a.applications()).track(job);await(await b.applications()).track(job);
  await assert.rejects(a.deleteAccount('no'),/Explicit/);
- assert.deepEqual(await a.deleteAccount('DELETE MY ACCOUNT'),{deleted:true});
+ assert.deepEqual(await a.deleteAccount('DELETE MY ACCOUNT'),{deleted:true,already_deleted:false,purged_objects:1});
  await assert.rejects(a.profile(),/not provisioned/);
  assert.equal((await b.profile()).name,'Candidate Beta');
  assert.equal((await b.contacts()).length,1);assert.equal((await(await b.applications()).list()).length,1);
  assert.deepEqual(Buffer.from((await b.readCV()).bytes),Buffer.from(cv));assert.equal(env.BUCKET.objects.size,1);
+});
+
+test('Concurrent first CV uploads use compare-and-swap; losing encrypted object is cleaned',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('candidate-a'));await a.onboard();
+ const original=env.BUCKET.put.bind(env.BUCKET);
+ let entered=0,release,ready;
+ const both=new Promise(resolve=>ready=resolve),gate=new Promise(resolve=>release=resolve);
+ env.BUCKET.put=async (...args)=>{entered++;if(entered===2)ready();await gate;return original(...args);};
+ const replacement=new TextEncoder().encode('%PDF-1.5\n2 0 obj << /Type /Page >> endobj\n%%EOF\n');
+ const first=a.uploadCV(cv),second=a.uploadCV(replacement);
+ await both;release();
+ const results=await Promise.allSettled([first,second]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(results.filter(x=>x.status==='rejected').length,1);
+ assert.match(String(results.find(x=>x.status==='rejected').reason),/changed concurrently/i);
+ assert.equal(env.BUCKET.objects.size,1);
+ const saved=await a.readCV();assert.equal(saved.bytes.length>25,true);
+});
+test('Concurrent CV replacements preserve one valid newest record, never delete its object',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('candidate-a'));await a.onboard();await a.uploadCV(cv);
+ const original=env.BUCKET.put.bind(env.BUCKET);
+ let entered=0,release,ready;
+ const both=new Promise(resolve=>ready=resolve),gate=new Promise(resolve=>release=resolve);
+ env.BUCKET.put=async (...args)=>{entered++;if(entered===2)ready();await gate;return original(...args);};
+ const b=new TextEncoder().encode('%PDF-1.5\n2 0 obj << /Type /Page >> endobj\n%%EOF\n');
+ const c=new TextEncoder().encode('%PDF-1.6\n3 0 obj << /Type /Page >> endobj\n%%EOF\n');
+ const results=[a.uploadCV(b),a.uploadCV(c)];await both;release();
+ const settled=await Promise.allSettled(results);
+ assert.equal(settled.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(settled.filter(x=>x.status==='rejected').length,1);
+ assert.equal(env.BUCKET.objects.size,1);
+ const recovered=await a.readCV();assert.ok(recovered.bytes[5]===49); // PDF version 1.x
+});
+test('Failed R2 purge revokes the user immediately; scheduler can finish deletion later',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('candidate-a'));await a.onboard();
+ await a.uploadCV(cv);
+ const orphan='tenants/'+a.id+'/cv/orphan-object.ocv';
+ env.BUCKET.objects.set(orphan,new Uint8Array([1,2,3]));
+ const realDelete=env.BUCKET.delete.bind(env.BUCKET);
+ let failed=false;
+ env.BUCKET.delete=async key=>{if(!failed){failed=true;throw Error('Temporary R2 failure');}return realDelete(key);};
+ await assert.rejects(a.deleteAccount('DELETE MY ACCOUNT'),/Temporary R2 failure/);
+ const dbState=env.sqlite.prepare('SELECT status FROM tenant_accounts WHERE id=?').get(a.id);
+ assert.equal(dbState.status,'deleting');
+ await assert.rejects(a.profile(),/inactive/);
+ env.BUCKET.delete=realDelete;
+ const result=await reconcileDeletingAccounts(env);
+ assert.deepEqual(result,{selected:1,completed:1,failed:0});
+ assert.equal(env.sqlite.prepare('SELECT COUNT(*) n FROM tenant_accounts WHERE id=?').get(a.id).n,0);
+ assert.equal(env.BUCKET.objects.size,0);
+ assert.deepEqual(await purgeDeletingTenant(env,a.id),{already_deleted:true,purged_objects:0});
+});
+test('Deletion refuses unexpected object ownership and does not remove other users files',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('candidate-a')),b=new TenantWorkspace(env,await principal('candidate-b'));
+ await a.onboard();await b.onboard();await a.uploadCV(cv);await b.uploadCV(cv);
+ const original=env.BUCKET.list.bind(env.BUCKET);
+ env.BUCKET.list=async opts=>({objects:[{key:'tenants/'+b.id+'/cv/not-owned.ocv'}],truncated:false});
+ await assert.rejects(a.deleteAccount('DELETE MY ACCOUNT'),/ownership mismatch/i);
+ assert.equal(env.sqlite.prepare('SELECT status FROM tenant_accounts WHERE id=?').get(a.id).status,'deleting');
+ env.BUCKET.list=original;
+ await reconcileDeletingAccounts(env);
+ assert.equal(env.BUCKET.objects.size,1);
+ assert.deepEqual(Buffer.from((await b.readCV()).bytes),Buffer.from(cv));
+});
+
+test('Profile revision control prevents lost updates from multiple tabs and MCP callers',async()=>{
+ const env=storage(),owner=new TenantWorkspace(env,await principal('candidate-profile-a'));
+ await owner.onboard();
+ const created=await owner.setProfile(profile('First State'));
+ assert.equal(created.revision,1);
+ const revised=await owner.setProfile({...profile('Second State'),expected_revision:1});
+ assert.equal(revised.revision,2);
+ assert.equal(revised.name,'Second State');
+ await assert.rejects(owner.setProfile({...profile('Stale Edit'),expected_revision:1}),/another session/);
+ await assert.rejects(owner.setProfile(profile('Blind Overwrite')),/another session/);
+ assert.equal((await owner.profile()).name,'Second State');
+ await assert.rejects(owner.setProfile({...profile('Wrong Field'),expected_revision:2,updated_at:'forged'}),/Unsupported profile field/);
+ const again=await owner.setProfile({...profile('Third State'),expected_revision:2});
+ assert.equal(again.revision,3);
+});
+
+test('Oversized tenant object namespaces are purged incrementally without deleting account early',async()=>{
+ const env=storage(),owner=new TenantWorkspace(env,await principal('candidate-large-purge'));
+ await owner.onboard();
+ for(let n=0;n<103;n++)env.BUCKET.objects.set('tenants/'+owner.id+'/cv/orphan-'+String(n).padStart(4,'0')+'.ocv',new Uint8Array([1]));
+ await assert.rejects(owner.deleteAccount('DELETE MY ACCOUNT'),/More objects remain/);
+ assert.equal(env.sqlite.prepare('SELECT status FROM tenant_accounts WHERE id=?').get(owner.id).status,'deleting');
+ assert.ok(env.BUCKET.objects.size>0);
+ assert.equal((await reconcileDeletingAccounts(env)).completed,1);
+ assert.equal(env.BUCKET.objects.size,0);
+ assert.equal(env.sqlite.prepare('SELECT COUNT(*) n FROM tenant_accounts WHERE id=?').get(owner.id).n,0);
 });

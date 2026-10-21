@@ -93,3 +93,13 @@ Multi-user workspaces can now save verified-by-user Greenhouse, Lever and Ashby 
 The repository now includes a tightly bounded, secret-protected `POST /api/internal/watch-scan` entrypoint for a **future trusted cloud schedule**. It checks at most three explicitly opted-in boards per invocation. It is **not yet scheduled in a deployed production environment** and does not send email alerts. See [employer monitoring documentation](docs/EMPLOYER_WATCHLISTS.md).
 
 This source capability must not be deployed publicly until the [commercial release gates](docs/COMMERCIAL_BETA_GATES.md) are independently validated, including owner/private data isolation, real OIDC accounts, staging database and storage, abuse controls and privacy compliance.
+
+## Release-blocking engineering audit — 21 October 2026
+
+See the [senior engineering audit, concrete remediations and unresolved launch gates](docs/SENIOR_ENGINEERING_AUDIT_2026-10-21.md).
+
+The latest changes introduce concurrent-CV compare-and-swap semantics, resumable R2/D1 account deletion, optimistic profile revisions (including the browser editor and MCP), stronger scheduled-monitoring consent enforcement, explicit ATS feed truncation reporting, safe error classification, complete-regression test execution and a verified production-build CI step.
+
+The source now uses patched Next.js, React Server Components and related runtime/build dependencies. The pnpm lockfile is regenerated and the production high/critical advisory check is a mandatory CI gate. One **unpatched dev-only transitive advisory in `braces`** remains tracked as [issue #12](https://github.com/engatworks/Open-Career/issues/12), without independent risk acceptance. Do not state that the product is vulnerability-free.
+
+**No public/commercial launch:** a real, segregated staging deployment, OIDC provider setup, independent security review, complete export/data lifecycle, contractual/privacy review, billing and supported portal submission evidence are not yet delivered. Keep the legacy owner workspace private, and do not interpret GitHub CI success as actual customer-data security certification.
