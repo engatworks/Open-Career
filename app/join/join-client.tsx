@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import styles from './join.module.css';
 
 type Session={tenant_id:string;name:string|null;email:string|null;csrf:string;signed_in:boolean};
-type Profile={name:string;headline:string;target_roles:string[];preferred_locations:string[];languages:string[];work_authorization:string;evidence:{id:string;claim:string}[];custom_fields:Record<string,string>};
+type Profile={name:string;headline:string;target_roles:string[];preferred_locations:string[];languages:string[];work_authorization:string;evidence:{id:string;claim:string}[];custom_fields:Record<string,string>;revision?:number};
 type Job={job_key:string;provider:string;board:string;job_id:string;title:string;location:string;apply_url:string;source_checked_at:string};
 type Saved={id:string;job_key:string;title:string;status:string;apply_url:string;created_at:string};
 type WatchedBoard={id:string;provider:string;board:string;region:string;label:string;last_success_at:string|null;last_error:string|null;new_count:number;auto_scan:number};
@@ -85,8 +85,9 @@ export default function JoinClient(){
  }
  async function saveProfile(){await action(async()=>{
   if(!session)return;
-  const info:Profile={...profile,name:profile.name.trim(),headline:profile.headline.trim(),target_roles:split(roles),preferred_locations:split(locations),languages:split(languages),evidence:evidence.split('\n').map((claim,i)=>({id:'fact-'+(i+1),claim:claim.trim()})).filter(x=>x.claim),custom_fields:profile.custom_fields||{}};
-  await api('/api/v2/profile',{method:'POST',body:JSON.stringify(info)});setProfile(info);setMessage('Your candidate profile was saved to your private workspace.');
+  const info:Profile={name:profile.name.trim(),headline:profile.headline.trim(),target_roles:split(roles),preferred_locations:split(locations),languages:split(languages),work_authorization:profile.work_authorization.trim(),evidence:evidence.split('\\n').map((claim,i)=>({id:'fact-'+(i+1),claim:claim.trim()})).filter(x=>x.claim),custom_fields:profile.custom_fields||{}};
+  const result=await api('/api/v2/profile',{method:'POST',body:JSON.stringify({...info,expected_revision:profile.revision??0})});
+  setProfile({...info,revision:result.profile.revision});setMessage('Your candidate profile was saved to your private workspace.');
  });}
  async function upload(file:File|undefined){if(!file)return;await action(async()=>{
   if(file.size>5_000_000||(file.type&&file.type!=='application/pdf'))throw Error('Choose a PDF smaller than 5 MB.');
