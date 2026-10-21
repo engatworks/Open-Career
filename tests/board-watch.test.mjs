@@ -112,7 +112,7 @@ test('A trusted secret gates the bounded cloud scheduler; only opted-in boards a
  let jobs=[record('1')],calls=0,time=Date.parse('2026-10-21T10:00:00.000Z');
  const discover=async()=>{calls++;return {jobs}};
  const baseline=await runScheduledWatches(env,{discover,now:()=>time});
- assert.deepEqual(baseline,{selected:1,completed:1,failed:0,newly_detected:0,baseline_scans:1});
+ assert.deepEqual(baseline,{selected:1,completed:1,failed:0,newly_detected:0,baseline_scans:1,account_cleanup:{selected:0,completed:0,failed:0}});
  assert.equal(calls,1);
  assert.equal((await b.boards())[0].last_success_at,null);
  assert.equal((await runScheduledWatches(env,{discover,now:()=>time})).selected,0);
