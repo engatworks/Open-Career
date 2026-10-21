@@ -1657,6 +1657,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "last_orphan_cursor": {
+          "name": "last_orphan_cursor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
