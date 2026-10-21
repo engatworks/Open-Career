@@ -7,6 +7,7 @@ CREATE TABLE `tenant_boards` (
   `label` text NOT NULL,
   `source_url` text NOT NULL,
   `created_at` text NOT NULL,
+  `auto_scan` integer DEFAULT 0 NOT NULL,
   `last_attempt_at` text,
   `last_success_at` text,
   `last_error` text
