@@ -1,3 +1,4 @@
+import {publicFailure} from '@/lib/public-errors.mjs';
 import {env} from 'cloudflare:workers';
 import {startLogin,finishLogin,describeSession,logout,loginAvailability} from '@/lib/browser-auth.mjs';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
@@ -15,8 +16,8 @@ async function handler(request:Request) {
   if(request.method==='POST'&&path==='logout')return logout(request,env);
   return json({error:'Unknown authentication endpoint'},404);
  }catch(error) {
-  const code=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:400;
-  return json({error:error instanceof Error?error.message:'Authentication failed'},code);
+  const failure=publicFailure(error);
+  return json({error:failure.message},failure.status);
  }
 }
 export const GET=handler;export const POST=handler;
