@@ -3,6 +3,7 @@ import {env} from 'cloudflare:workers';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
+import {TenantExport} from '@/lib/tenant-export.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
 import {BoardWatch} from '@/lib/board-watch.mjs';
 import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
@@ -91,7 +92,23 @@ async function handle(request:Request){
    return respond({application:await(await workspace.applications()).approve(input.id,input)});
   }
   if(request.method==='POST'&&path==='applications/cancel'){const input=await json(request);return respond({application:await(await workspace.applications()).cancel(input.id)});}
-  if(request.method==='GET'&&path==='export')return Response.json(await workspace.exportData(),{headers:{...headers,'Content-Disposition':'attachment; filename="open-career-export.json"'}});
+  if(request.method==='GET'&&path==='export/manifest'){
+   await throttleTenant(env,identity,'export_read',120,{intervalSeconds:3600});
+   return respond(await(new TenantExport(workspace)).manifest());
+  }
+  if(request.method==='GET'&&path==='export/page'){
+   await throttleTenant(env,identity,'export_read',120,{intervalSeconds:3600});
+   return respond(await(new TenantExport(workspace)).page({
+    collection:url.searchParams.get('collection'),
+    cursor:url.searchParams.get('cursor'),
+    limit:Number(url.searchParams.get('limit')||100)
+   }));
+  }
+  // Deprecated one-shot export is retained for compatible clients but is explicitly partial.
+  if(request.method==='GET'&&path==='export')
+   return Response.json({...await workspace.exportData(),partial:true,
+    notice:'This legacy download has fixed row limits. Use /export/manifest and /export/page to retrieve all records; download the CV PDF separately.'},
+    {headers:{...headers,'Content-Disposition':'attachment; filename="open-career-partial-export.json"'}});
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){
