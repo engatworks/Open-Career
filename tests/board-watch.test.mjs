@@ -112,7 +112,7 @@ test('A trusted secret gates the bounded cloud scheduler; only opted-in boards a
  let jobs=[record('1')],calls=0,time=Date.parse('2026-10-21T10:00:00.000Z');
  const discover=async()=>{calls++;return {jobs}};
  const baseline=await runScheduledWatches(env,{discover,now:()=>time});
- assert.deepEqual(baseline,{selected:1,completed:1,failed:0,newly_detected:0,baseline_scans:1,account_cleanup:{selected:0,completed:0,failed:0}});
+ assert.deepEqual(baseline,{selected:1,completed:1,failed:0,newly_detected:0,baseline_scans:1,account_cleanup:{selected:0,completed:0,failed:0},orphan_cleanup:{enabled:false},retention_cleanup:{throttles:0,sessions:0,login_transactions:0}});
  assert.equal(calls,1);
  assert.equal((await b.boards())[0].last_success_at,null);
  assert.equal((await runScheduledWatches(env,{discover,now:()=>time})).selected,0);
@@ -135,4 +135,19 @@ test('A revoked monitoring opt-in blocks a queued scheduled fetch before reachin
  assert.equal(calls,0);
  await a.scan(saved.board.id); // A user-initiated manual scan still works without opt-in.
  assert.equal(calls,1);
+});
+
+test('Scheduled housekeeping expires only stale auth and throttle state, not active sessions',async()=>{
+ const {DB,sqlite}=storage(),secret=Buffer.alloc(32,21).toString('base64url');
+ const env={DB,OPENCAREER_ACCESS_MODE:'multiuser_beta',OPENCAREER_WATCH_CRON_SECRET:secret};
+ const time=Date.parse('2026-10-21T10:00:00.000Z');
+ sqlite.prepare("INSERT INTO browser_sessions(token_hash,tenant_id,created_at,expires_at) VALUES(?,?,?,?)").run('expired',owner('a'),'2026-10-01','2026-10-20');
+ sqlite.prepare("INSERT INTO browser_sessions(token_hash,tenant_id,created_at,expires_at) VALUES(?,?,?,?)").run('valid',owner('a'),'2026-10-21','2026-10-22');
+ sqlite.prepare("INSERT INTO login_transactions(state_hash,code_verifier,nonce,expires_at) VALUES('expired','x','nonce','2026-10-01')").run();
+ sqlite.prepare("INSERT INTO login_transactions(state_hash,code_verifier,nonce,expires_at) VALUES('valid','x','nonce','2026-10-22')").run();
+ sqlite.prepare("INSERT INTO request_limits(bucket,count,expires_at) VALUES('expired:abcdefgh',1,?)").run(time-2*86400000);
+ const result=await runScheduledWatches(env,{now:()=>time});
+ assert.deepEqual(result.retention_cleanup,{throttles:1,sessions:1,login_transactions:1});
+ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM browser_sessions").get().n,1);
+ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM login_transactions").get().n,1);
 });
