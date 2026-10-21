@@ -101,6 +101,7 @@ export const tenantBoards=sqliteTable('tenant_boards',{
  id:text('id').primaryKey(),tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
  provider:text('provider').notNull(),board:text('board').notNull(),region:text('region').notNull().default('global'),
  label:text('label').notNull(),source_url:text('source_url').notNull(),created_at:text('created_at').notNull(),
+ auto_scan:integer('auto_scan').notNull().default(0),
  last_attempt_at:text('last_attempt_at'),last_success_at:text('last_success_at'),last_error:text('last_error'),
 },t=>[
  uniqueIndex('tenant_boards_unique').on(t.tenant_id,t.provider,t.board,t.region),
