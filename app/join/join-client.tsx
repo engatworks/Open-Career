@@ -43,7 +43,7 @@ export default function JoinClient(){
   }
   if(typeof init.body==='string')headers.set('Content-Type','application/json');
   const response=await fetch(path,{...init,method,headers,credentials:'same-origin',cache:'no-store'});
-  const data=await response.json();
+  const data:any=await response.json();
   if(!response.ok)throw Error(data.error||'Request unsuccessful');
   return data;
  }
@@ -60,7 +60,7 @@ export default function JoinClient(){
   let active=true;
   (async()=>{
    try{
-    const availability=await fetch('/auth/status',{cache:'no-store'}).then(r=>r.json());
+    const availability:any=await fetch('/auth/status',{cache:'no-store'}).then(r=>r.json());
     if(!active)return;setConfigured(availability.configured===true);
     if(availability.configured){
      const res=await fetch('/auth/session',{cache:'no-store'});
