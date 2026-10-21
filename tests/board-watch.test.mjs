@@ -124,3 +124,15 @@ test('A trusted secret gates the bounded cloud scheduler; only opted-in boards a
  assert.equal((await runScheduledWatches(env,{discover,now:()=>time})).selected,0);
  assert.equal((await a.boards())[0].auto_scan,0);
 });
+
+test('A revoked monitoring opt-in blocks a queued scheduled fetch before reaching its provider',async()=>{
+ const {DB}=storage();let calls=0;
+ const a=new BoardWatch(DB,owner('a'),{discover:async()=>{calls++;return {jobs:[record('1')]}}});
+ const saved=await a.save(board);
+ await a.setAutoScan(saved.board.id,true);
+ await a.setAutoScan(saved.board.id,false);
+ await assert.rejects(a.scan(saved.board.id,{requireOptIn:true}),/consent/);
+ assert.equal(calls,0);
+ await a.scan(saved.board.id); // A user-initiated manual scan still works without opt-in.
+ assert.equal(calls,1);
+});
