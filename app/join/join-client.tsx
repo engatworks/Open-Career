@@ -99,7 +99,8 @@ export default function JoinClient(){
   if(!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(board))throw Error('Enter a valid employer board slug.');
   const url='/api/v2/ats/jobs?'+new URLSearchParams({provider,board,q:query,limit:'50'});
   const result=await api(url);setJobs(result.jobs||[]);setDiscoveryAt(result.checked_at);
-  if(!result.jobs?.length)setMessage('No matching jobs were returned from this public board.');
+  if(result.partial_results)setMessage('Results are limited to '+result.returned+' of '+result.matched_total+' matching published jobs. Narrow the search for more complete results.');
+  else if(!result.jobs?.length)setMessage('No matching jobs were returned from this public board.');
  });}
  async function saveBoard(){await action(async()=>{
   const result=await api('/api/v2/boards',{method:'POST',body:JSON.stringify({provider,board,region:'global',label:boardLabel})});
@@ -109,7 +110,7 @@ export default function JoinClient(){
   const result=await api('/api/v2/boards/scan',{method:'POST',body:JSON.stringify({id})});
   const [wb,oj]=await Promise.all([api('/api/v2/boards'),api('/api/v2/listings?status=new')]);
   setBoards(wb.items);setNewJobs(oj.items);
-  setMessage(result.baseline?'Baseline saved: '+result.found+' public listings. Future scans will highlight new ones.':result.newly_detected+' newly detected listings out of '+result.found+' checked.');
+  setMessage(result.partial_results?'Partial feed: the search limit was reached. These listings are only a subset; review the official board for complete coverage.':result.baseline?'Baseline saved: '+result.found+' public listings. Future scans will highlight newly observed jobs.':result.newly_detected+' newly observed jobs out of '+result.found+' checked.');
  });}
  async function toggleAutoScan(b:WatchedBoard){await action(async()=>{
   await api('/api/v2/boards/auto',{method:'POST',body:JSON.stringify({id:b.id,enabled:!b.auto_scan})});
