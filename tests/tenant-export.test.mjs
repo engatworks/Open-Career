@@ -27,7 +27,7 @@ test('Large workspace export is fully traversable with bounded tenant-specific c
  events.run(b);contact.run('b-private',b,'secret@example.com','Other user','Other');
  jobs.run(b,'board-b','greenhouse:acme:private');
  const exportA=new TenantExport(workspace(a)),manifest=await exportA.manifest();
- assert.deepEqual(manifest.counts,{contacts:515,applications:133,employer_boards:1,observed_jobs:315,events:2150});
+ assert.deepEqual(manifest.counts,{auth_identities:0,contacts:515,applications:133,employer_boards:1,observed_jobs:315,events:2150});
  assert.equal(manifest.snapshot_consistent,false);
  for(const [collection,total] of Object.entries(manifest.counts)){
   let cursor=null,all=[],n=0;
@@ -36,7 +36,7 @@ test('Large workspace export is fully traversable with bounded tenant-specific c
   if(all.length)assert.ok(all.every(row=>row.tenant_id===a));
  }
  const exportB=new TenantExport(workspace(b));
- assert.deepEqual((await exportB.manifest()).counts,{contacts:1,applications:0,employer_boards:1,observed_jobs:1,events:1});
+ assert.deepEqual((await exportB.manifest()).counts,{auth_identities:0,contacts:1,applications:0,employer_boards:1,observed_jobs:1,events:1});
  assert.equal((await exportB.page({collection:'contacts'})).items[0].email,'secret@example.com');
 });
 test('Export refuses invalid collections, unbounded pages and cursor injection',async()=>{
