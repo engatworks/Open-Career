@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { Career } from '@/lib/career.mjs';
+import {legacyAllowed} from '@/lib/release-security.mjs';
 import { discoverATSJobs } from '@/lib/ats-discovery.mjs';
 export const dynamic='force-dynamic';
 const object=(properties:Record<string,unknown>,required:string[]=[])=>({type:'object',properties,required,additionalProperties:false});
@@ -30,7 +31,10 @@ const tools=[
  {name:'record_reply',description:'Mark an actual later recipient reply verified in the outgoing Gmail thread.',inputSchema:object({id:str},['id'])},
  {name:'finish_research_run',description:'Finish a run with evidence and hold reasons. Queued/sent counts are computed from stored records, not trusted from prose.',inputSchema:object({run_id:str,report:{type:'object'}},['run_id','report'])},
 ];
-export async function POST(request:Request){let rpc:any;try{if(Number(request.headers.get('content-length')||0)>200000)throw Error('MCP input too large');rpc=await request.json();if(!rpc||rpc.jsonrpc!=='2.0')throw Error('Invalid JSON-RPC request');
+export async function POST(request:Request){
+ // Fail closed before tool listing or input parsing: includes private CV bytes in career_context.
+ if(!legacyAllowed(env))return Response.json({error:'Not found'},{status:404,headers:{'Cache-Control':'no-store'}});
+ let rpc:any;try{if(Number(request.headers.get('content-length')||0)>200000)throw Error('MCP input too large');rpc=await request.json();if(!rpc||rpc.jsonrpc!=='2.0')throw Error('Invalid JSON-RPC request');
  if(rpc.method==='server/discover')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{supportedVersions:['2026-07-28'],capabilities:{tools:{}}}});
  if(rpc.method==='initialize')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'Open Career',version:'0.5.0'}}});
  if(rpc.method==='tools/list')return Response.json({jsonrpc:'2.0',id:rpc.id,result:{tools}});
