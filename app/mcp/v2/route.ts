@@ -26,7 +26,10 @@ export async function POST(request:Request){
   if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return Response.json({error:'Cross-origin access refused'},{status:403});
   const identity=await authenticate(request,env);
   if(Number(request.headers.get('content-length')||0)>50000)throw Error('MCP request exceeds allowed size');
-  const rpc:any=await request.json();
+  const reader=request.body?.getReader();if(!reader)throw Error('MCP request body missing');let size=0;const chunks:Uint8Array[]=[];
+  try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>50000)throw Error('MCP request exceeds allowed size');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}
+  const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+  const rpc:any=JSON.parse(new TextDecoder().decode(bytes));
   id=rpc?.id??null;
   if(rpc?.jsonrpc!=='2.0'||typeof rpc.method!=='string')throw Error('Invalid JSON-RPC');
   if(rpc.method==='initialize')return Response.json({jsonrpc:'2.0',id,result:{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'Open Career multi-user',version:'0.6.0-alpha'}}});
