@@ -127,6 +127,31 @@ export default function JoinClient(){
   setSaved((await api('/api/v2/applications')).items);
   setMessage('Job saved. No application was submitted.');
  });}
+ async function downloadAllData(){await action(async()=>{
+  const manifest=await api('/api/v2/export/manifest');
+  const records:Record<string,unknown[]>={};
+  for(const collection of manifest.collections as string[]){
+   if(manifest.counts[collection]>10000)throw Error('This workspace exceeds the single-download size limit. Use the paginated export API to retrieve it in batches.');
+   const items:unknown[]=[];let cursor:string|null=null,pages=0;
+   do{
+    if(++pages>101)throw Error('Export page limit reached; use the paginated API.');
+    const params=new URLSearchParams({collection,limit:'100'});
+    if(cursor)params.set('cursor',cursor);
+    const page=await api('/api/v2/export/page?'+params);
+    if(page.collection!==collection||!Array.isArray(page.items))throw Error('Export response did not match the requested collection');
+    items.push(...page.items);cursor=page.next_cursor;
+   }while(cursor);
+   if(items.length!==manifest.counts[collection])throw Error('Workspace changed while exporting. No incomplete file was downloaded; please retry.');
+   records[collection]=items;
+  }
+  const exportData={...manifest,records,export_completed_at:new Date().toISOString()};
+  const output=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});
+  const objectURL=URL.createObjectURL(output);
+  try{
+   const a=document.createElement('a');a.href=objectURL;a.download='open-career-workspace-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();
+  }finally{setTimeout(()=>URL.revokeObjectURL(objectURL),1000);}
+  setMessage('Workspace export downloaded. CV PDF is separate; live-data exports are not transactionally snapshotted.');
+ });}
  async function addContact(){await action(async()=>{
   await api('/api/v2/contacts',{method:'POST',body:JSON.stringify(contact)});
   setContacts((await api('/api/v2/contacts')).items);setContact({email:'',name:'',company:'',role:'',source_url:''});
@@ -171,7 +196,7 @@ export default function JoinClient(){
     <div className={styles.resultList}>{jobs.map(j=><article className={styles.result} key={j.job_key}><div><strong>{j.title}</strong><span>{j.location||'Location not listed'} · {j.provider}</span></div><div className={styles.resultActions}><a href={j.apply_url} target="_blank" rel="noopener noreferrer">Official listing ↗</a><button disabled={busy||saved.some(s=>s.job_key===j.job_key)} onClick={()=>saveJob(j)}>{saved.some(s=>s.job_key===j.job_key)?'Saved':'Save role'}</button></div></article>)}</div>
     <h3>Saved opportunities <span className={styles.count}>{saved.length}</span></h3><div className={styles.resultList}>{saved.map(s=><article className={styles.result} key={s.id}><div><strong>{s.title}</strong><span>{s.status.replaceAll('_',' ')} · Not auto-submitted</span></div><a href={s.apply_url} target="_blank" rel="noopener noreferrer">View listing ↗</a></article>)}</div>{!saved.length&&<div className={styles.empty}>Your saved opportunities will appear here.</div>}</section>}
    {tab==='Contacts'&&<section className={styles.panel}><h2>People and professional connections</h2><p>Save relevant published business contacts for research. A saved address is not permission to email someone or proof their employment is current.</p><div className={styles.formGrid}><label>Professional email<input value={contact.email} onChange={e=>setContact({...contact,email:e.target.value})} type="email" placeholder="contact@company.com"/></label><label>Name<input value={contact.name} onChange={e=>setContact({...contact,name:e.target.value})}/></label><label>Company<input value={contact.company} onChange={e=>setContact({...contact,company:e.target.value})}/></label><label>Role<input value={contact.role} onChange={e=>setContact({...contact,role:e.target.value})}/></label><label className={styles.wide}>Public source URL<input value={contact.source_url} onChange={e=>setContact({...contact,source_url:e.target.value})} placeholder="https://company.com/team"/></label></div><button className={styles.primary} disabled={busy||!contact.email} onClick={addContact}>Add contact <Icon name="arrow"/></button><div className={styles.resultList}>{contacts.map(c=><article key={c.id} className={styles.result}><div><strong>{c.name||c.email}</strong><span>{c.company||'Company unverified'} · {c.status}</span></div><span>{c.email}</span></article>)}</div></section>}
-   {tab==='Privacy'&&<section className={styles.panel}><h2>It's your information.</h2><p>Download an export of your workspace history, retrieve your CV separately, or revoke this browser session. Deleting your account permanently removes your workspace records and associated stored CV.</p><div className={styles.privacyActions}><a className={styles.secondary} href="/api/v2/export">Export your workspace JSON ↗</a>{cv&&<a className={styles.secondary} href="/api/v2/cv">Download your CV ↗</a>}<button className={styles.secondary} disabled={busy} onClick={()=>action(async()=>{await api('/auth/logout',{method:'POST'});window.location.assign('/join');})}>Sign out of this browser</button></div><div className={styles.danger}><h3>Delete account</h3><p>This action cannot be undone. Type <strong>DELETE MY ACCOUNT</strong> to confirm.</p><input aria-label="Account deletion confirmation" value={confirmDelete} onChange={e=>setConfirmDelete(e.target.value)} placeholder="DELETE MY ACCOUNT"/><button disabled={busy||confirmDelete!=='DELETE MY ACCOUNT'} onClick={()=>action(async()=>{await api('/api/v2/account',{method:'DELETE',body:JSON.stringify({confirm:confirmDelete})});window.location.assign('/join');})}>Permanently delete my account</button></div></section>}
+   {tab==='Privacy'&&<section className={styles.panel}><h2>It's your information.</h2><p>Download an export of your workspace history, retrieve your CV separately, or revoke this browser session. Deleting your account permanently removes your workspace records and associated stored CV.</p><div className={styles.privacyActions}><button className={styles.secondary} disabled={busy} onClick={downloadAllData}>Export all workspace records</button>{cv&&<a className={styles.secondary} href="/api/v2/cv">Download your CV ↗</a>}<button className={styles.secondary} disabled={busy} onClick={()=>action(async()=>{await api('/auth/logout',{method:'POST'});window.location.assign('/join');})}>Sign out of this browser</button></div><div className={styles.danger}><h3>Delete account</h3><p>This action cannot be undone. Type <strong>DELETE MY ACCOUNT</strong> to confirm.</p><input aria-label="Account deletion confirmation" value={confirmDelete} onChange={e=>setConfirmDelete(e.target.value)} placeholder="DELETE MY ACCOUNT"/><button disabled={busy||confirmDelete!=='DELETE MY ACCOUNT'} onClick={()=>action(async()=>{await api('/api/v2/account',{method:'DELETE',body:JSON.stringify({confirm:confirmDelete})});window.location.assign('/join');})}>Permanently delete my account</button></div></section>}
    <footer className={styles.dashFooter}>OPEN CAREER · EARLY ACCESS <span>Prepared by you. Controlled by you.</span></footer>
   </div>
  </main>;
