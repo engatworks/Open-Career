@@ -29,6 +29,13 @@
       "when": 1792591200000,
       "tag": "0003_ats_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792589400000,
+      "tag": "0004_tenant_workspaces",
+      "breakpoints": true
     }
   ]
 }
