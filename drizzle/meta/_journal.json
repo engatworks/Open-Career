@@ -36,6 +36,13 @@
       "when": 1792589400000,
       "tag": "0004_tenant_workspaces",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792591200000,
+      "tag": "0005_browser_oidc",
+      "breakpoints": true
     }
   ]
 }
