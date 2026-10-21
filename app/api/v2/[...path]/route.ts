@@ -3,6 +3,7 @@ import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
+import {BoardWatch} from '@/lib/board-watch.mjs';
 import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
@@ -41,6 +42,27 @@ async function handle(request:Request){
   }
   if(request.method==='GET'&&path==='me'){
    let account=null;try{account=await workspace.me();}catch(error){if(!(error instanceof Error)||!/not provisioned|inactive/.test(error.message))throw error;}return respond({tenant_id:identity.tenantId,registered:!!account,account});
+  }
+  if(path.startsWith('boards')||path==='listings'){
+   await workspace.account();
+   const watch=new BoardWatch(env.DB,identity.tenantId);
+   if(request.method==='GET'&&path==='boards')return respond({items:await watch.boards()});
+   if(request.method==='GET'&&path==='listings')return respond({items:await watch.listings({status:url.searchParams.get('status')||null,limit:Number(url.searchParams.get('limit')||100)})});
+   if(request.method==='POST'&&path==='boards'){
+    await throttleTenant(env,identity,'watch_write',30,{intervalSeconds:3600});
+    return respond(await watch.save(await json(request)),201);
+   }
+   if(request.method==='DELETE'&&path==='boards'){
+    await throttleTenant(env,identity,'watch_write',30,{intervalSeconds:3600});
+    const input=await json(request);return respond(await watch.remove(input.id));
+   }
+   if(request.method==='POST'&&path==='boards/scan'){
+    await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
+    const input=await json(request);return respond(await watch.scan(input.id));
+   }
+   if(request.method==='POST'&&path==='boards/seen'){
+    const input=await json(request);return respond(await watch.markSeen(input.job_key));
+   }
   }
   if(request.method==='GET'&&path==='profile')return respond({profile:await workspace.profile()});
   if(request.method==='POST'&&path==='profile')return respond({profile:await workspace.setProfile(await json(request))});
