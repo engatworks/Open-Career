@@ -2,6 +2,8 @@ import {env} from 'cloudflare:workers';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
+import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
+import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 const respond=(value:unknown,status=200)=>Response.json(value,{status,headers});
@@ -17,11 +19,26 @@ async function json(request:Request){
 }
 async function handle(request:Request){
  try{
+  assertMultiuserAllowed(env);
   const url=new URL(request.url),path=url.pathname.replace(/^\/api\/v2\/?/,'');
   if(request.headers.get('origin')&&request.headers.get('origin')!==url.origin)return respond({error:'Cross-origin requests are not permitted'},403);
   const identity=await identityForAPI(request,env);
   const workspace=new TenantWorkspace(env,identity);
-  if(request.method==='POST'&&path==='onboard')return respond({account:await workspace.onboard(),tenant_id:identity.tenantId},201);
+  if(request.method==='POST'&&path==='onboard'){
+   await throttleTenant(env,identity,'onboard',6,{intervalSeconds:3600});
+   await assertOnboardingAllowed(env,identity);
+   return respond({account:await workspace.onboard(),tenant_id:identity.tenantId},201);
+  }
+  // Public provider jobs are read only, but fetching them has cost: require own registered account and quota.
+  if(request.method==='GET'&&path==='ats/jobs'){
+   await workspace.account();
+   await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
+   return respond(await discoverATSJobs({provider:url.searchParams.get('provider'),board:url.searchParams.get('board'),region:url.searchParams.get('region')||'global',query:url.searchParams.get('q')||'',limit:Number(url.searchParams.get('limit')||50)}));
+  }
+  // A bounded tenant quota applies to all workspace mutations, whether called from UI or REST clients.
+  if(request.method!=='GET'&&request.method!=='HEAD'){
+   await throttleTenant(env,identity,'workspace_write',80,{intervalSeconds:3600});
+  }
   if(request.method==='GET'&&path==='me'){
    let account=null;try{account=await workspace.me();}catch(error){if(!(error instanceof Error)||!/not provisioned|inactive/.test(error.message))throw error;}return respond({tenant_id:identity.tenantId,registered:!!account,account});
   }
@@ -52,7 +69,7 @@ async function handle(request:Request){
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){
-  const status=error instanceof IdentityError?error.status:error instanceof SyntaxError?400:
+  const status=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:error instanceof SyntaxError?400:
    error instanceof Error&&/not provisioned|inactive/.test(error.message)?403:400;
   return respond({error:error instanceof Error?error.message:'Request failed'},status);
  }
