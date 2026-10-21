@@ -52,7 +52,8 @@ function providerFetch(tokenFactory){
 }
 async function finish(env,tx,sub='candidate-1',nonce=tx.nonce){
  const callback=new Request(origin+'/auth/callback?'+new URLSearchParams({state:tx.state,code:'auth-code'}),{headers:{cookie:tx.cookie}});
- const response=await finishLogin(callback,env,{fetcher:providerFetch(()=>issueToken(sub,nonce))});
+ const email=sub==='candidate-1'?'candidate@example.com':sub+'@example.com';
+ const response=await finishLogin(callback,env,{fetcher:providerFetch(()=>issueToken(sub,nonce,{email}))});
  const cookies=response.headers.getSetCookie();
  const sessionLine=cookies.find(c=>c.startsWith('__Host-oc_session='));
  assert.ok(sessionLine);return {response,cookie:sessionLine.split(';')[0],cookies};
