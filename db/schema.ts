@@ -96,3 +96,25 @@ export const requestLimits=sqliteTable('request_limits',{
  bucket:text('bucket').primaryKey(),count:integer('count').notNull().default(0),
  expires_at:integer('expires_at').notNull(),
 },t=>[index('request_limits_expiry').on(t.expires_at)]);
+
+export const tenantBoards=sqliteTable('tenant_boards',{
+ id:text('id').primaryKey(),tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ provider:text('provider').notNull(),board:text('board').notNull(),region:text('region').notNull().default('global'),
+ label:text('label').notNull(),source_url:text('source_url').notNull(),created_at:text('created_at').notNull(),
+ last_attempt_at:text('last_attempt_at'),last_success_at:text('last_success_at'),last_error:text('last_error'),
+},t=>[
+ uniqueIndex('tenant_boards_unique').on(t.tenant_id,t.provider,t.board,t.region),
+ index('tenant_boards_recent').on(t.tenant_id,t.last_success_at),
+]);
+export const tenantJobSightings=sqliteTable('tenant_job_sightings',{
+ tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ board_id:text('board_id').notNull().references(()=>tenantBoards.id,{onDelete:'cascade'}),
+ job_key:text('job_key').notNull(),title:text('title').notNull(),location:text('location').notNull().default(''),
+ apply_url:text('apply_url').notNull(),first_seen_at:text('first_seen_at').notNull(),
+ last_seen_at:text('last_seen_at').notNull(),status:text('status').notNull().default('known'),
+},t=>[
+ primaryKey({columns:[t.tenant_id,t.job_key]}),
+ index('tenant_jobs_by_board').on(t.tenant_id,t.board_id,t.first_seen_at),
+ index('tenant_jobs_by_status').on(t.tenant_id,t.status,t.first_seen_at),
+ check('tenant_job_status_check',sql`${t.status} IN ('new','known','seen')`),
+]);
