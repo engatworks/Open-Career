@@ -69,3 +69,11 @@ The codebase now includes a separate, **fail-closed OIDC-authenticated** workspa
 
 **Not a public multi-user release.** A production identity provider, OAuth login UX, key provisioning, staging deployment and full access-control audit are still needed. The current owner-global `Career` API/MCP and private legacy CV/history must remain owner-private, never exposed on a public multi-user host. GitHub merges do not automatically update the private deployment. See [multi-user setup and security gates](docs/MULTITENANT_AUTH_IMPLEMENTATION.md).
 
+
+## Browser sign-in and onboarding (alpha)
+
+A dedicated, responsive `/join` screen now provides a real sign-in/onboarding front end for the private, tenant-scoped v2 workspace. It includes a candidate profile editor, encrypted CV upload/download, Greenhouse/Lever/Ashby public job discovery, saved opportunities, contact records, workspace export, logout and account deletion.
+
+The sign-in backend uses OpenID Connect Authorization Code + S256 PKCE with one-use state/nonce and server-side ID-token verification; opaque revocable HttpOnly cookies protect browser sessions, with CSRF checks on mutations. No provider tokens are stored in browser JavaScript. [Authentication setup and release checks](docs/BROWSER_LOGIN_IMPLEMENTATION.md).
+
+**Not yet deployed or open to registrations:** OIDC provider credentials, stable HTTPS domain, secrets, real staging tests and separate protection for the legacy owner-only API are prerequisites. Without these settings, `/join` safely displays a registration-unavailable state. Saving a job does not submit an application.
