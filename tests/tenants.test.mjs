@@ -207,3 +207,15 @@ test('Profile revision control prevents lost updates from multiple tabs and MCP 
  const again=await owner.setProfile({...profile('Third State'),expected_revision:2});
  assert.equal(again.revision,3);
 });
+
+test('Oversized tenant object namespaces are purged incrementally without deleting account early',async()=>{
+ const env=storage(),owner=new TenantWorkspace(env,await principal('candidate-large-purge'));
+ await owner.onboard();
+ for(let n=0;n<103;n++)env.BUCKET.objects.set('tenants/'+owner.id+'/cv/orphan-'+String(n).padStart(4,'0')+'.ocv',new Uint8Array([1]));
+ await assert.rejects(owner.deleteAccount('DELETE MY ACCOUNT'),/More objects remain/);
+ assert.equal(env.sqlite.prepare('SELECT status FROM tenant_accounts WHERE id=?').get(owner.id).status,'deleting');
+ assert.ok(env.BUCKET.objects.size>0);
+ assert.equal((await reconcileDeletingAccounts(env)).completed,1);
+ assert.equal(env.BUCKET.objects.size,0);
+ assert.equal(env.sqlite.prepare('SELECT COUNT(*) n FROM tenant_accounts WHERE id=?').get(owner.id).n,0);
+});
