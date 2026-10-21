@@ -123,5 +123,6 @@ export const tenantJobSightings=sqliteTable('tenant_job_sightings',{
 export const tenantMaintenance=sqliteTable('tenant_maintenance',{
  tenant_id:text('tenant_id').primaryKey().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
  last_orphan_scan_at:text('last_orphan_scan_at'),
+ last_orphan_cursor:text('last_orphan_cursor'),
  last_orphan_deleted:integer('last_orphan_deleted').notNull().default(0),
 },t=>[index('tenant_maintenance_scan').on(t.last_orphan_scan_at)]);
