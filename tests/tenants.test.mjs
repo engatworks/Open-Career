@@ -6,6 +6,7 @@ import {authenticate,IdentityError,clearKeyCacheForTests} from '../lib/tenant-id
 import {TenantWorkspace} from '../lib/tenant-workspace.mjs';
 import {purgeDeletingTenant,reconcileDeletingAccounts} from '../lib/tenant-purge.mjs';
 import {encryptCV,decryptCV,encryptedCVKeyId,activeCVKeyId} from '../lib/cv-crypto.mjs';
+import {sweepTenantOrphanCVs,runOrphanMaintenance} from '../lib/tenant-maintenance.mjs';
 const b64=x=>Buffer.from(x).toString('base64url');
 const secret=b64(crypto.getRandomValues(new Uint8Array(32)));
 const encryption=b64(crypto.getRandomValues(new Uint8Array(32)));
@@ -33,15 +34,15 @@ function storage(){
   async batch(statements){sqlite.exec('BEGIN');try{const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result;}catch(error){sqlite.exec('ROLLBACK');throw error;}}
  };
  class R2{
-  constructor(){this.objects=new Map();}
-  async put(k,bytes){this.objects.set(k,new Uint8Array(bytes));}
+  constructor(){this.objects=new Map();this.timestamps=new Map();}
+  async put(k,bytes){this.objects.set(k,new Uint8Array(bytes));this.timestamps.set(k,new Date());}
   async get(k){const data=this.objects.get(k);return data?{arrayBuffer:async()=>data.slice().buffer}:null;}
-  async delete(k){this.objects.delete(k);}
+  async delete(k){this.objects.delete(k);this.timestamps.delete(k);}
   async list({prefix,limit=100,cursor}={}){
    const keys=[...this.objects.keys()].filter(k=>k.startsWith(prefix||'')).sort();
    const start=cursor?keys.findIndex(k=>k===cursor)+1:0;
    const page=keys.slice(start,start+limit);
-   return {objects:page.map(key=>({key})),truncated:start+limit<keys.length,cursor:start+limit<keys.length?page[page.length-1]:undefined};
+   return {objects:page.map(key=>({key,uploaded:this.timestamps.get(key)})),truncated:start+limit<keys.length,cursor:start+limit<keys.length?page[page.length-1]:undefined};
   }
  }
  const BUCKET=new R2();
@@ -265,4 +266,50 @@ test('Misconfigured CV ring fails closed instead of silently reverting to legacy
  env.OPENCAREER_CV_KEYRING=JSON.stringify({active:'a',keys:{a:env.OPENCAREER_CV_ENCRYPTION_KEY}});
  await assert.rejects(w.uploadCV(cv),/must differ/);
  assert.equal(env.BUCKET.objects.size,0);
+});
+
+test('Age-gated orphan sweep deletes only unreferenced old encrypted files from the correct tenant',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('gc-a')),b=new TenantWorkspace(env,await principal('gc-b'));
+ await a.onboard();await b.onboard();await a.uploadCV(cv);await b.uploadCV(cv);
+ const oldDate=new Date(Date.now()-100*60*60*1000);
+ const row=env.sqlite.prepare("SELECT storage_key FROM tenant_documents WHERE tenant_id=?").get(a.id);
+ env.BUCKET.timestamps.set(row.storage_key,oldDate);
+ const orphan='tenants/'+a.id+'/cv/old-orphan.ocv',newObject='tenants/'+a.id+'/cv/new-upload.ocv',other='tenants/'+b.id+'/cv/old-orphan.ocv';
+ env.BUCKET.objects.set(orphan,new Uint8Array([1]));env.BUCKET.timestamps.set(orphan,oldDate);
+ env.BUCKET.objects.set(newObject,new Uint8Array([2]));env.BUCKET.timestamps.set(newObject,new Date());
+ env.BUCKET.objects.set(other,new Uint8Array([3]));env.BUCKET.timestamps.set(other,oldDate);
+ const scan=await sweepTenantOrphanCVs(env,a.id);
+ assert.equal(scan.deleted,1);
+ assert.ok(env.BUCKET.objects.has(row.storage_key));
+ assert.ok(env.BUCKET.objects.has(newObject));
+ assert.ok(env.BUCKET.objects.has(other));
+ assert.ok(!env.BUCKET.objects.has(orphan));
+ assert.deepEqual(Buffer.from((await a.readCV()).bytes),Buffer.from(cv));
+});
+test('Orphan garbage collection advances through bounded R2 pages and does not consume current documents',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('gc-many'));
+ await a.onboard();await a.uploadCV(cv);
+ const oldDate=new Date(Date.now()-100*60*60*1000);
+ for(let i=0;i<210;i++){
+  const k='tenants/'+a.id+'/cv/old-'+String(i).padStart(4,'0')+'.ocv';
+  env.BUCKET.objects.set(k,new Uint8Array([1]));env.BUCKET.timestamps.set(k,oldDate);
+ }
+ let sum=0;
+ for(let turn=0;turn<35;turn++){
+  const result=await sweepTenantOrphanCVs(env,a.id,{maxPages:1,maxDeletes:25});sum+=result.deleted;
+  if(sum===210)break;
+ }
+ assert.equal(sum,210);
+ assert.equal(env.BUCKET.objects.size,1);
+ assert.deepEqual(Buffer.from((await a.readCV()).bytes),Buffer.from(cv));
+ const state=env.sqlite.prepare("SELECT last_orphan_deleted FROM tenant_maintenance WHERE tenant_id=?").get(a.id);
+ assert.equal(state.last_orphan_deleted,210);
+});
+test('Orphan cleanup refuses unknown object-age metadata rather than deleting recently uploaded ciphertext',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('gc-unknown'));
+ await a.onboard();
+ const k='tenants/'+a.id+'/cv/unknown.ocv';
+ env.BUCKET.objects.set(k,new Uint8Array([3]));
+ assert.equal((await sweepTenantOrphanCVs(env,a.id)).deleted,0);
+ assert.ok(env.BUCKET.objects.has(k));
 });
