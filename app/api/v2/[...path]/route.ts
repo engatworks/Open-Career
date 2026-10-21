@@ -22,7 +22,7 @@ async function handle(request:Request){
   const workspace=new TenantWorkspace(env,identity);
   if(request.method==='POST'&&path==='onboard')return respond({account:await workspace.onboard(),tenant_id:identity.tenantId},201);
   if(request.method==='GET'&&path==='me'){
-   let account=null;try{account=await workspace.me();}catch{}return respond({tenant_id:identity.tenantId,registered:!!account,account});
+   let account=null;try{account=await workspace.me();}catch(error){if(!(error instanceof Error)||!/not provisioned|inactive/.test(error.message))throw error;}return respond({tenant_id:identity.tenantId,registered:!!account,account});
   }
   if(request.method==='GET'&&path==='profile')return respond({profile:await workspace.profile()});
   if(request.method==='POST'&&path==='profile')return respond({profile:await workspace.setProfile(await json(request))});
