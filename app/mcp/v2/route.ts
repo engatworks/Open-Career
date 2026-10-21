@@ -26,7 +26,7 @@ export async function POST(request:Request){
   if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return Response.json({error:'Cross-origin access refused'},{status:403});
   const identity=await authenticate(request,env);
   if(Number(request.headers.get('content-length')||0)>50000)throw Error('MCP request exceeds allowed size');
-  const rpc=await request.json();
+  const rpc:any=await request.json();
   id=rpc?.id??null;
   if(rpc?.jsonrpc!=='2.0'||typeof rpc.method!=='string')throw Error('Invalid JSON-RPC');
   if(rpc.method==='initialize')return Response.json({jsonrpc:'2.0',id,result:{protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'Open Career multi-user',version:'0.6.0-alpha'}}});
