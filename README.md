@@ -62,3 +62,10 @@ The source now includes read-only official job-board discovery for **Greenhouse,
 - Application tracking foundation: tenant-scoped `ApplicationLedger`, additive SQL migration, reviewed CV/form/answer fingerprints, consent-based approval, one submission attempt and uncertain-state quarantine. **No write endpoints are exposed.**
 
 This is not yet a public multi-user agent or an automated portal applicant. Existing candidate profiles, CVs, contact records and outreach remain owner-private and must be redesigned with authenticated tenant isolation before user registration can safely be opened. ATS account signup, browser form filling, MFA handoff and application submission are not yet implemented. See [implementation details](docs/ATS_IMPLEMENTATION.md) and [roadmap](docs/MULTIUSER_ATS_ROADMAP.md).
+
+## Authenticated multi-user workspace (alpha source, 21 October 2026)
+
+The codebase now includes a separate, **fail-closed OIDC-authenticated** workspace at `/api/v2/*` and `/mcp/v2`. It derives each tenant ID from a cryptographically verified identity token, stores candidate profiles and contacts with tenant-scoped SQL, encrypts each user's CV with AES-256-GCM before R2 storage, and isolates ATS application tracking. It supports private export and explicit account deletion. The security tests exercise two simulated users with real RSA signatures, SQLite and mock R2; existing outreach tests remain intact.
+
+**Not a public multi-user release.** A production identity provider, OAuth login UX, key provisioning, staging deployment and full access-control audit are still needed. The current owner-global `Career` API/MCP and private legacy CV/history must remain owner-private, never exposed on a public multi-user host. GitHub merges do not automatically update the private deployment. See [multi-user setup and security gates](docs/MULTITENANT_AUTH_IMPLEMENTATION.md).
+
