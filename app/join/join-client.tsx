@@ -84,7 +84,7 @@ export default function JoinClient(){
   await api('/api/v2/profile',{method:'POST',body:JSON.stringify(info)});setProfile(info);setMessage('Your candidate profile was saved to your private workspace.');
  });}
  async function upload(file:File|undefined){if(!file)return;await action(async()=>{
-  if(file.size>5_000_000||file.type!=='application/pdf')throw Error('Choose a PDF smaller than 5 MB.');
+  if(file.size>5_000_000||(file.type&&file.type!=='application/pdf'))throw Error('Choose a PDF smaller than 5 MB.');
   const bytes=await file.arrayBuffer();
   await api('/api/v2/cv',{method:'POST',body:bytes,headers:{'Content-Type':'application/pdf'}});
   const next=await api('/api/v2/cv/info');setCv(next.cv);setMessage('CV uploaded and encrypted in your workspace.');
