@@ -32,6 +32,19 @@
 
 An account in `deleting` is inaccessible even if its deletion cannot yet be finalized. The trusted scheduler adapter attempts to reconcile up to three such accounts per invocation, but **this cannot work until the scheduler is actually deployed and configured**. Operator support and incident alerting must be established first.
 
+## Critical supply-chain finding and remediation
+
+An actual GitHub runner audit of the prior `pnpm-lock.yaml` discovered **one critical and five high** advisories among production dependencies, including:
+
+- `next@16.3.4`: critical `next/og` remote-code-execution advisory (`GHSA-vcvr-r3jv-pc5j`, patched at `16.3.6+`) and high image-optimization SSRF (`GHSA-cjq9-62q9-8jv4`, patched at `16.3.8+`).
+- `browserslist<=4.28.6`: two high advisories (`GHSA-c83g-rgw3-j3cx`, `GHSA-73wf-gq98-2v4g`), patched at `4.28.7+`.
+- `source-map-js<1.2.2`: high event-loop denial of service (`GHSA-68fv-2mgg-jv7q`).
+- `sharp<0.35.5`: high librsvg-related advisory (`GHSA-wq5f-xc86-pv6w`).
+
+**Source mitigation:** Upgraded `next` to `16.3.8`, pinned patched transitive versions in `pnpm-workspace.yaml` and **regenerated `pnpm-lock.yaml` with integrity hashes using the GitHub Actions runner**. The temporary privileged refresh workflow was removed. CI now fails on production high/critical advisories, and includes dev/build-time audit. The production build and test suite must still pass against the exact updated lockfile. The initial patched production scan reported **three remaining lower-severity advisories (one low, two moderate)**; these require separate triage and do NOT justify claiming zero vulnerabilities.
+
+Full advisory links can be verified at `https://github.com/advisories/<GHSA-ID>`. Exposure depends on actual runtime use; source scanning is preventive, not proof of compromise.
+
 ## OPEN P0 — launch blockers (not solved by merging source)
 
 1. **Infrastructure isolation and authentication.** The owner-private v1 API and MCP can access the owner's CV and outreach history. `owner_private` still delegates authentication to the verified upstream private Sites gateway. Never expose this mode publicly. A separate public beta project must have its own D1/R2/credentials, OIDC client and origin. Test that every legacy route is 404 on that host (including CV payload), from both anonymous and logged-in tenant sessions.
