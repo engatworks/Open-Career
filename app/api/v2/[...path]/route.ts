@@ -48,7 +48,7 @@ async function handle(request:Request){
    return respond({application:await(await workspace.applications()).approve(input.id,input)});
   }
   if(request.method==='POST'&&path==='applications/cancel'){const input=await json(request);return respond({application:await(await workspace.applications()).cancel(input.id)});}
-  if(request.method==='GET'&&path==='export')return respond(await workspace.exportData());
+  if(request.method==='GET'&&path==='export')return Response.json(await workspace.exportData(),{headers:{...headers,'Content-Disposition':'attachment; filename="open-career-export.json"'}});
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){
