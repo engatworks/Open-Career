@@ -1,6 +1,6 @@
 import {publicFailure} from '@/lib/public-errors.mjs';
 import {env} from 'cloudflare:workers';
-import {startLogin,finishLogin,describeSession,logout,loginAvailability} from '@/lib/browser-auth.mjs';
+import {startLogin,finishLogin,describeSession,logout,loginAvailability,listBrowserSessions,revokeOtherBrowserSessions,revokeAllBrowserSessions} from '@/lib/browser-auth.mjs';
 import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {AccessError} from '@/lib/release-security.mjs';
 export const dynamic='force-dynamic';
@@ -13,6 +13,9 @@ async function handler(request:Request) {
   if(request.method==='GET'&&path==='start')return startLogin(request,env);
   if(request.method==='GET'&&path==='callback')return finishLogin(request,env);
   if(request.method==='GET'&&path==='session')return json(await describeSession(request,env));
+  if(request.method==='GET'&&path==='sessions')return json(await listBrowserSessions(request,env));
+  if(request.method==='POST'&&path==='sessions/revoke-others')return json(await revokeOtherBrowserSessions(request,env));
+  if(request.method==='POST'&&path==='logout-all')return revokeAllBrowserSessions(request,env);
   if(request.method==='POST'&&path==='logout')return logout(request,env);
   return json({error:'Unknown authentication endpoint'},404);
  }catch(error) {
