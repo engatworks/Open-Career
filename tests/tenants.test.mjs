@@ -35,6 +35,12 @@ function storage(){
   async put(k,bytes){this.objects.set(k,new Uint8Array(bytes));}
   async get(k){const data=this.objects.get(k);return data?{arrayBuffer:async()=>data.slice().buffer}:null;}
   async delete(k){this.objects.delete(k);}
+  async list({prefix,limit=100,cursor}={}){
+   const keys=[...this.objects.keys()].filter(k=>k.startsWith(prefix||'')).sort();
+   const start=cursor?keys.findIndex(k=>k===cursor)+1:0;
+   const page=keys.slice(start,start+limit);
+   return {objects:page.map(key=>({key})),truncated:start+limit<keys.length,cursor:start+limit<keys.length?page[page.length-1]:undefined};
+  }
  }
  const BUCKET=new R2();
  return {...config,DB,BUCKET,sqlite};
@@ -115,7 +121,7 @@ test('One user deletion leaves all other user data and CV untouched',async()=>{
  await a.addContact({email:'private@example.com'});await b.addContact({email:'private@example.com'});
  await(await a.applications()).track(job);await(await b.applications()).track(job);
  await assert.rejects(a.deleteAccount('no'),/Explicit/);
- assert.deepEqual(await a.deleteAccount('DELETE MY ACCOUNT'),{deleted:true});
+ assert.deepEqual(await a.deleteAccount('DELETE MY ACCOUNT'),{deleted:true,already_deleted:false,purged_objects:1});
  await assert.rejects(a.profile(),/not provisioned/);
  assert.equal((await b.profile()).name,'Candidate Beta');
  assert.equal((await b.contacts()).length,1);assert.equal((await(await b.applications()).list()).length,1);
