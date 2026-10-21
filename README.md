@@ -77,3 +77,11 @@ A dedicated, responsive `/join` screen now provides a real sign-in/onboarding fr
 The sign-in backend uses OpenID Connect Authorization Code + S256 PKCE with one-use state/nonce and server-side ID-token verification; opaque revocable HttpOnly cookies protect browser sessions, with CSRF checks on mutations. No provider tokens are stored in browser JavaScript. [Authentication setup and release checks](docs/BROWSER_LOGIN_IMPLEMENTATION.md).
 
 **Not yet deployed or open to registrations:** OIDC provider credentials, stable HTTPS domain, secrets, real staging tests and separate protection for the legacy owner-only API are prerequisites. Without these settings, `/join` safely displays a registration-unavailable state. Saving a job does not submit an application.
+
+## Commercial-beta isolation (21 October 2026)
+
+**The default deployment is now closed.** Set `OPENCAREER_ACCESS_MODE=owner_private` explicitly to retain the existing privately hosted owner's tracker (and verify the Sites gateway is owner-only); or `OPENCAREER_ACCESS_MODE=multiuser_beta` for a **separate** invitation-only tenant site. `multiuser_public` is reserved for a later, independently approved launch. Missing/invalid access mode denies legacy API, MCP and account signup.
+
+Public v2 job discovery uses `GET /api/v2/ats/jobs` with signed tenant identity and atomic rate limits. `OPENCAREER_BETA_EMAIL_ALLOWLIST` restricts first-time registrations to verified invitees; both OAuth callback and direct REST/MCP onboarding enforce it. **Do not deploy this change to the current owner-private Site without updating the explicit access-mode setting first.**
+
+Full details, comparisons, rollout and commercial go/no-go gates: [Commercial Beta Gates](docs/COMMERCIAL_BETA_GATES.md) and [Security Policy](SECURITY.md). This is source hardening, not a public launch or claim of compliance.
