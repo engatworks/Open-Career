@@ -39,6 +39,8 @@ jobs:
         run: node --test tests/tenants.test.mjs
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check migration history consistency
+        run: node node_modules/drizzle-kit/bin.cjs check
       - name: Existing ATS and cloud regression tests
         run: node --test tests/ats.test.mjs tests/cloud.test.mjs
       - name: TypeScript type-check
