@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index, check } from 'drizzle-orm/sqlite-core';
 
 export const configuration = sqliteTable('configuration', {key:text('key').primaryKey(),value:text('value').notNull(),revision:integer('revision').notNull().default(0)});
 export const outreach = sqliteTable('outreach', {
@@ -33,3 +33,20 @@ export const companyInventory=sqliteTable('company_inventory',{
  domain:text('domain').primaryKey(),name:text('name').notNull(),industry:text('industry').notNull().default(''),location:text('location').notNull().default(''),
  provider:text('provider').notNull(),source_url:text('source_url').notNull(),attribution:text('attribution').notNull().default(''),updated_at:text('updated_at').notNull(),
 });
+
+\n// New application ledger only: no legacy outreach tables are exposed to additional tenants.
+export const atsApplications=sqliteTable('ats_applications',{
+ id:text('id').primaryKey(),tenant_id:text('tenant_id').notNull(),
+ job_key:text('job_key').notNull(),provider:text('provider').notNull(),board:text('board').notNull(),
+ job_id:text('job_id').notNull(),title:text('title').notNull(),apply_url:text('apply_url').notNull(),
+ status:text('status').notNull().default('discovered'),
+ cv_sha256:text('cv_sha256'),answers_sha256:text('answers_sha256'),form_sha256:text('form_sha256'),
+ approval_at:text('approval_at'),attempt_token:text('attempt_token'),attempted_at:text('attempted_at'),
+ provider_reference:text('provider_reference'),confirmed_at:text('confirmed_at'),last_error:text('last_error'),
+ created_at:text('created_at').notNull(),updated_at:text('updated_at').notNull(),
+},t=>[
+ uniqueIndex('ats_applications_tenant_job').on(t.tenant_id,t.job_key),
+ index('ats_applications_tenant_status').on(t.tenant_id,t.status),
+ uniqueIndex('ats_applications_attempt_token').on(t.attempt_token),
+ check('ats_application_status',sql`${t.status} IN ('discovered','prepared','approved','submitting','submitted','needs_reconciliation','cancelled')`),
+]);
