@@ -91,7 +91,7 @@ export default function JoinClient(){
  });}
  async function searchJobs(){await action(async()=>{
   if(!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(board))throw Error('Enter a valid employer board slug.');
-  const url='/api/ats/jobs?'+new URLSearchParams({provider,board,q:query,limit:'50'});
+  const url='/api/v2/ats/jobs?'+new URLSearchParams({provider,board,q:query,limit:'50'});
   const result=await api(url);setJobs(result.jobs||[]);setDiscoveryAt(result.checked_at);
   if(!result.jobs?.length)setMessage('No matching jobs were returned from this public board.');
  });}
