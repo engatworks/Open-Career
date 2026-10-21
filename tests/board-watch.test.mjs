@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {BoardWatch} from '../lib/board-watch.mjs';
+import {authorizeWatchScheduler,runScheduledWatches} from '../lib/watch-scheduler.mjs';
 const owner=id=>'usr_'+id.repeat(43);
 function storage(){
  const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
@@ -83,4 +84,43 @@ test('Board registration has a hard per-tenant cap and does not allow arbitrary 
  await assert.rejects(watch.save({provider:'lever',board:'company26',label:'Company 26'}),/full/);
  assert.equal((await watch.boards()).length,25);
  await assert.rejects(watch.save({provider:'greenhouse',board:'http://169.254.0.1',label:'Internal'}),/Invalid board/);
+});
+
+test('Background scanning is opt-in, owner-scoped and disabled by default',async()=>{
+ const {DB}=storage(),a=new BoardWatch(DB,owner('a')),b=new BoardWatch(DB,owner('b'));
+ const x=await a.save(board),y=await b.save(board);
+ assert.equal((await a.boards())[0].auto_scan,0);
+ await assert.rejects(b.setAutoScan(x.board.id,true),/not found/);
+ assert.equal((await a.setAutoScan(x.board.id,true)).auto_scan,true);
+ assert.equal((await a.boards())[0].auto_scan,1);
+ assert.equal((await b.boards())[0].auto_scan,0);
+ await a.setAutoScan(x.board.id,false);
+ assert.equal((await a.boards())[0].auto_scan,0);
+ await b.setAutoScan(y.board.id,true);assert.equal((await b.boards())[0].auto_scan,1);
+});
+test('A trusted secret gates the bounded cloud scheduler; only opted-in boards are scanned',async()=>{
+ const {DB}=storage(),secret=Buffer.alloc(32,21).toString('base64url');
+ const env={DB,OPENCAREER_ACCESS_MODE:'multiuser_beta',OPENCAREER_WATCH_CRON_SECRET:secret};
+ const a=new BoardWatch(DB,owner('a')),b=new BoardWatch(DB,owner('b'));
+ const first=await a.save(board),second=await b.save(board);
+ await a.setAutoScan(first.board.id,true);
+ const real=new Request('https://career.example.com/api/internal/watch-scan',{method:'POST',headers:{authorization:'Bearer '+secret}});
+ assert.equal(authorizeWatchScheduler(real,env),true);
+ assert.throws(()=>authorizeWatchScheduler(new Request('https://career.example.com/api/internal/watch-scan',{method:'POST',headers:{authorization:'Bearer wrong'}}),env),/Unauthorized/);
+ assert.throws(()=>authorizeWatchScheduler(new Request('https://career.example.com/api/internal/watch-scan',{method:'POST',headers:{origin:'https://career.example.com',authorization:'Bearer '+secret}}),env),/browser/);
+ assert.throws(()=>authorizeWatchScheduler(real,{...env,OPENCAREER_ACCESS_MODE:'owner_private'}),/not enabled/);
+ let jobs=[record('1')],calls=0,time=Date.parse('2026-10-21T10:00:00.000Z');
+ const discover=async()=>{calls++;return {jobs}};
+ const baseline=await runScheduledWatches(env,{discover,now:()=>time});
+ assert.deepEqual(baseline,{selected:1,completed:1,failed:0,newly_detected:0,baseline_scans:1});
+ assert.equal(calls,1);
+ assert.equal((await b.boards())[0].last_success_at,null);
+ assert.equal((await runScheduledWatches(env,{discover,now:()=>time})).selected,0);
+ time+=61*60*1000;jobs=[record('1'),record('2')];
+ const next=await runScheduledWatches(env,{discover,now:()=>time});
+ assert.equal(next.newly_detected,1);assert.equal((await a.listings({status:'new'})).length,1);
+ await a.setAutoScan(first.board.id,false);
+ time+=61*60*1000;
+ assert.equal((await runScheduledWatches(env,{discover,now:()=>time})).selected,0);
+ assert.equal((await a.boards())[0].auto_scan,0);
 });
