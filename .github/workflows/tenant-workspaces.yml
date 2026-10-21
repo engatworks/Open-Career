@@ -1,0 +1,45 @@
+name: Multi-user security and regression tests
+
+on:
+  pull_request:
+    paths:
+      - 'lib/tenant-identity.mjs'
+      - 'lib/tenant-workspace.mjs'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/0004_tenant_workspaces.sql'
+      - 'tests/tenants.test.mjs'
+      - '.github/workflows/tenant-workspaces.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/tenant-identity.mjs'
+      - 'lib/tenant-workspace.mjs'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/0004_tenant_workspaces.sql'
+      - 'tests/tenants.test.mjs'
+      - '.github/workflows/tenant-workspaces.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Signed identity and tenant data isolation
+        run: node --test tests/tenants.test.mjs
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Existing ATS and cloud regression tests
+        run: node --test tests/ats.test.mjs tests/cloud.test.mjs
+      - name: TypeScript type-check
+        run: node node_modules/typescript/bin/tsc --noEmit
