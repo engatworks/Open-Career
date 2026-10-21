@@ -44,5 +44,7 @@ jobs:
         run: corepack pnpm audit --prod --audit-level low
       - name: Check production dependencies for high and critical advisories
         run: corepack pnpm audit --prod --audit-level high
+      - name: Check build/development dependencies for high and critical advisories
+        run: corepack pnpm audit --dev --audit-level high
       - name: Compile production project, not just isolated TypeScript files
         run: corepack pnpm build
