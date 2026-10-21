@@ -1,6 +1,9 @@
 name: Senior release audit and fault-injection suite
 
 on:
+  schedule:
+    - cron: '23 07 * * 1'
+  workflow_dispatch:
   pull_request:
     paths:
       - 'lib/**'
