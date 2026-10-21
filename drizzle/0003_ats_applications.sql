@@ -7,7 +7,7 @@ CREATE TABLE `ats_applications` (
   `job_id` text NOT NULL,
   `title` text NOT NULL,
   `apply_url` text NOT NULL,
-  `status` text DEFAULT 'discovered' NOT NULL CHECK (`status` IN ('discovered','prepared','approved','submitting','submitted','needs_reconciliation','cancelled')),
+  `status` text DEFAULT 'discovered' NOT NULL,
   `cv_sha256` text,
   `answers_sha256` text,
   `form_sha256` text,
@@ -18,7 +18,8 @@ CREATE TABLE `ats_applications` (
   `confirmed_at` text,
   `last_error` text,
   `created_at` text NOT NULL,
-  `updated_at` text NOT NULL
+  `updated_at` text NOT NULL,
+  CONSTRAINT `ats_application_status` CHECK (`status` IN ('discovered','prepared','approved','submitting','submitted','needs_reconciliation','cancelled'))
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `ats_applications_tenant_job` ON `ats_applications` (`tenant_id`,`job_key`);
