@@ -19,10 +19,20 @@ All calls operate on the identity verified by the v2 OIDC/session boundary and r
 
 The `ats_jobs` tenant quota limits official API calls; the per-board 10-minute lease stops double scans and ambiguous concurrent updates. A provider failure records the error without overwriting previous sightings or last success. SQL inserts are idempotent. No job automatically becomes a confirmed suitable opportunity, and a newly detected job is not a guarantee it remains available.
 
-**Not yet running in the background:** Scans currently require a user/MCP invocation. Future provider-approved scheduling should use trusted Cloudflare Cron/Queues, bounded batches, automatic retries only for idempotent reads, and per-user notification consent. Do not claim the monitoring engine sends email alerts today.
+**Background scheduler adapter implemented, but not yet activated:** The user can opt in to monitoring each employer board. The server offers a secret-protected `POST /api/internal/watch-scan` endpoint that selects up to three opted-in boards per run, enforces a one-hour interval, records newly seen jobs in each owner's private workspace, and clears expired rate-limit rows. The endpoint needs a trusted cloud scheduler to invoke it; **no live scheduled job has been registered or tested**, and the system sends no email alerts today. Failures remain visible as board error records.
 
 ## Commercial readiness
 
 This is an improvement over one-off searches of a board slug, but **not global job aggregation**. Companies may not use these three ATS providers; even on supported platforms the user must verify which board belongs to the employer. Add authoritative board discovery, a licensed jobs data strategy, eligible-country filters, compensation normalization and independent posting freshness checks before marketing worldwide comprehensive job coverage.
 
 Staging deployment must first complete the separate `docs/COMMERCIAL_BETA_GATES.md` owner-data isolation and signup procedures. Keep user environments separate, apply the 0007 migration in a backup-tested manner, and validate D1 conflict behavior against real Cloudflare before commercial launch.
+
+## Optional trusted schedule integration
+
+1. On a **separate multi-user staging host**, configure `OPENCAREER_WATCH_CRON_SECRET` as the base64url encoding of an independently generated, random 32-byte secret. Never commit it, use an existing OAuth client secret, or expose it in frontend JavaScript.
+2. Configure your trusted Cloudflare Cron/Queue/worker scheduler to call `POST https://YOUR_HOST/api/internal/watch-scan` with server-side `Authorization: Bearer <secret>`. Browser-origin requests are rejected. The call must originate from your protected cloud infrastructure.
+3. Run the job at an operator-approved interval (e.g. hourly). Each invocation checks a maximum of three opted-in employer boards. Test throughput, retries, quotas and provider terms before raising the limit.
+4. The user can opt out at any time using the UI or `POST /api/v2/boards/auto`; the scheduler checks `auto_scan=1` before each run and does not access contact emails or CVs.
+5. Monitor HTTP status, error rates and D1 costs. The endpoint returns aggregate counts, not customer PII. Build opt-in notification delivery as a separate, provider-authorized process that uses actual message receipts.
+
+**Current state:** The endpoint is only a deployable source capability; it has not been installed as a running Cloudflare cron, and user-facing job-alert notifications do not exist yet.
