@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, uniqueIndex, index, check } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, uniqueIndex, index, check, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const configuration = sqliteTable('configuration', {key:text('key').primaryKey(),value:text('value').notNull(),revision:integer('revision').notNull().default(0)});
 export const outreach = sqliteTable('outreach', {
@@ -50,3 +50,34 @@ export const atsApplications=sqliteTable('ats_applications',{
  uniqueIndex('ats_applications_attempt_token').on(t.attempt_token),
  check('ats_application_status',sql`${t.status} IN ('discovered','prepared','approved','submitting','submitted','needs_reconciliation','cancelled')`),
 ]);
+
+export const tenantAccounts=sqliteTable('tenant_accounts',{
+ id:text('id').primaryKey(),email:text('email'),display_name:text('display_name'),
+ status:text('status').notNull().default('active'),
+ created_at:text('created_at').notNull(),last_seen_at:text('last_seen_at').notNull(),
+},t=>[check('tenant_accounts_status_check',sql`${t.status} IN ('active','deleting')`)]);
+export const tenantProfiles=sqliteTable('tenant_profiles',{
+ tenant_id:text('tenant_id').primaryKey().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ data:text('data').notNull(),revision:integer('revision').notNull().default(1),updated_at:text('updated_at').notNull(),
+});
+export const tenantDocuments=sqliteTable('tenant_documents',{
+ tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ kind:text('kind').notNull(),storage_key:text('storage_key').notNull(),sha256:text('sha256').notNull(),
+ byte_length:integer('byte_length').notNull(),created_at:text('created_at').notNull(),
+},t=>[primaryKey({columns:[t.tenant_id,t.kind]})]);
+export const tenantContacts=sqliteTable('tenant_contacts',{
+ id:text('id').primaryKey(),tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ email:text('email').notNull(),name:text('name').notNull().default(''),
+ company:text('company').notNull().default(''),role:text('role').notNull().default(''),
+ source_url:text('source_url'),status:text('status').notNull().default('unverified'),
+ created_at:text('created_at').notNull(),updated_at:text('updated_at').notNull(),
+},t=>[
+ uniqueIndex('tenant_contacts_email').on(t.tenant_id,t.email),
+ index('tenant_contacts_status').on(t.tenant_id,t.status),
+ check('tenant_contact_status_check',sql`${t.status} IN ('unverified','verified','suppressed')`),
+]);
+export const tenantEvents=sqliteTable('tenant_events',{
+ id:integer('id').primaryKey({autoIncrement:true}),
+ tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ at:text('at').notNull(),kind:text('kind').notNull(),detail:text('detail').notNull(),
+},t=>[index('tenant_events_owner').on(t.tenant_id,t.at)]);
