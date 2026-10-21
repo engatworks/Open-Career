@@ -6,7 +6,7 @@ type Session={tenant_id:string;name:string|null;email:string|null;csrf:string;si
 type Profile={name:string;headline:string;target_roles:string[];preferred_locations:string[];languages:string[];work_authorization:string;evidence:{id:string;claim:string}[];custom_fields:Record<string,string>};
 type Job={job_key:string;provider:string;board:string;job_id:string;title:string;location:string;apply_url:string;source_checked_at:string};
 type Saved={id:string;job_key:string;title:string;status:string;apply_url:string;created_at:string};
-type WatchedBoard={id:string;provider:string;board:string;region:string;label:string;last_success_at:string|null;last_error:string|null;new_count:number};
+type WatchedBoard={id:string;provider:string;board:string;region:string;label:string;last_success_at:string|null;last_error:string|null;new_count:number;auto_scan:number};
 type ObservedJob={job_key:string;title:string;location:string;apply_url:string;first_seen_at:string;status:string};
 const blank:Profile={name:'',headline:'',target_roles:[],preferred_locations:[],languages:[],work_authorization:'',evidence:[],custom_fields:{}};
 const nav=['Overview','Profile','My CV','Jobs','Contacts','Privacy'] as const;
@@ -110,6 +110,11 @@ export default function JoinClient(){
   setBoards(wb.items);setNewJobs(oj.items);
   setMessage(result.baseline?'Baseline saved: '+result.found+' public listings. Future scans will highlight new ones.':result.newly_detected+' newly detected listings out of '+result.found+' checked.');
  });}
+ async function toggleAutoScan(b:WatchedBoard){await action(async()=>{
+  await api('/api/v2/boards/auto',{method:'POST',body:JSON.stringify({id:b.id,enabled:!b.auto_scan})});
+  setBoards((await api('/api/v2/boards')).items);
+  setMessage(b.auto_scan?'Background checks disabled for this board.':'Background checks opted in. They will run only after the trusted cloud scheduler is configured.');
+ });}
  async function seeJob(jobKey:string){await action(async()=>{
   await api('/api/v2/boards/seen',{method:'POST',body:JSON.stringify({job_key:jobKey})});
   const [wb,oj]=await Promise.all([api('/api/v2/boards'),api('/api/v2/listings?status=new')]);setBoards(wb.items);setNewJobs(oj.items);
@@ -157,7 +162,7 @@ export default function JoinClient(){
    {tab==='Jobs'&&<section className={styles.panel}><h2>Find a better fit</h2><p>Search the official public job boards used by Greenhouse, Lever and Ashby. The employer's board identifier is required; results are not independently verified vacancies or eligibility decisions.</p><div className={styles.searchGrid}><label>Recruitment platform<select value={provider} onChange={e=>setProvider(e.target.value)}><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="ashby">Ashby</option></select></label><label>Employer board slug<input value={board} onChange={e=>setBoard(e.target.value)} placeholder="example-company"/></label><label>Filter by role or location<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Engineer, Dublin…"/></label><button className={styles.primary} disabled={busy} onClick={searchJobs}>Find openings <Icon name="arrow"/></button></div>{discoveryAt&&<p className={styles.tiny}>Public listing check: {new Date(discoveryAt).toLocaleString()}</p>}
     <div className={styles.watchBlock}><h3>My employer watchlist <span className={styles.count}>{boards.length}/25</span></h3><p>Save the employer's official ATS board once, then rescan it. The first scan establishes a baseline; later scans identify newly published job listings.</p>
       <div className={styles.watchRegister}><label>Employer display name<input value={boardLabel} maxLength={160} onChange={e=>setBoardLabel(e.target.value)} placeholder="Company name"/></label><button className={styles.secondary} disabled={busy||!boardLabel.trim()||!board.trim()} onClick={saveBoard}>Watch current board</button></div>
-      <div className={styles.resultList}>{boards.map(b=><article className={styles.result} key={b.id}><div><strong>{b.label}</strong><span>{b.provider} / {b.board} · {b.new_count} new · {b.last_success_at?'Last scan: '+new Date(b.last_success_at).toLocaleDateString():'Needs first scan'}</span>{b.last_error&&<span>Last check issue: {b.last_error}</span>}</div><button className={styles.secondary} onClick={()=>scanBoard(b.id)} disabled={busy}>Scan now</button></article>)}</div>
+      <div className={styles.resultList}>{boards.map(b=><article className={styles.result} key={b.id}><div><strong>{b.label}</strong><span>{b.provider} / {b.board} · {b.new_count} new · {b.last_success_at?'Last scan: '+new Date(b.last_success_at).toLocaleDateString():'Needs first scan'}</span>{b.last_error&&<span>Last check issue: {b.last_error}</span>}</div><div className={styles.resultActions}><button className={styles.secondary} onClick={()=>scanBoard(b.id)} disabled={busy}>Scan now</button><button className={styles.secondary} disabled={busy} onClick={()=>toggleAutoScan(b)}>{b.auto_scan?'Turn off auto-scan':'Opt in to auto-scan'}</button></div></article>)}</div>
       <h3>Newly detected jobs <span className={styles.count}>{newJobs.length}</span></h3>
       <div className={styles.resultList}>{newJobs.map(j=><article key={j.job_key} className={styles.result}><div><strong>{j.title}</strong><span>{j.location||'Location not listed'} · observed {new Date(j.first_seen_at).toLocaleDateString()}</span></div><div className={styles.resultActions}><a href={j.apply_url} rel="noopener noreferrer" target="_blank">Official listing ↗</a><button disabled={busy} onClick={()=>seeJob(j.job_key)}>Mark seen</button></div></article>)}</div>
     </div>
