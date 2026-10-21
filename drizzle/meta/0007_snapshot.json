@@ -1450,6 +1450,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "auto_scan": {
+          "name": "auto_scan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
