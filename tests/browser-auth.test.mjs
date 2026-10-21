@@ -7,7 +7,7 @@ import {IdentityError,clearKeyCacheForTests} from '../lib/tenant-identity.mjs';
 const origin='https://career.example.com';
 const b64=v=>Buffer.from(v).toString('base64url');
 const nowSec=()=>Math.floor(Date.now()/1000);
-const settings={OPENCAREER_SITE_ORIGIN:origin,OPENCAREER_OIDC_ISSUER:'https://id.example.com',OPENCAREER_OIDC_AUTH_URL:'https://id.example.com/authorize',OPENCAREER_OIDC_TOKEN_URL:'https://id.example.com/token',OPENCAREER_OIDC_JWKS_URL:'https://id.example.com/jwks',OPENCAREER_OIDC_CLIENT_ID:'open-career-client',OPENCAREER_OIDC_CLIENT_SECRET:'this-is-a-private-test-secret',OPENCAREER_OIDC_AUDIENCE:'open-career-api',OPENCAREER_TENANT_SECRET:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_CV_ENCRYPTION_KEY:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_SESSION_SECRET:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_ACCESS_MODE:'multiuser_beta',OPENCAREER_BETA_EMAIL_ALLOWLIST:'candidate@example.com'};
+const settings={OPENCAREER_SITE_ORIGIN:origin,OPENCAREER_OIDC_ISSUER:'https://id.example.com',OPENCAREER_OIDC_AUTH_URL:'https://id.example.com/authorize',OPENCAREER_OIDC_TOKEN_URL:'https://id.example.com/token',OPENCAREER_OIDC_JWKS_URL:'https://id.example.com/jwks',OPENCAREER_OIDC_CLIENT_ID:'open-career-client',OPENCAREER_OIDC_CLIENT_SECRET:'this-is-a-private-test-secret',OPENCAREER_OIDC_AUDIENCE:'open-career-api',OPENCAREER_TENANT_SECRET:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_CV_ENCRYPTION_KEY:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_SESSION_SECRET:b64(crypto.getRandomValues(new Uint8Array(32))),OPENCAREER_ACCESS_MODE:'multiuser_beta',OPENCAREER_BETA_EMAIL_ALLOWLIST:'candidate@example.com,candidate-a@example.com,candidate-b@example.com,shared-candidate@example.com'};
 let keypair,publicJwk;
 before(async()=>{
  clearKeyCacheForTests();keypair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
@@ -52,7 +52,8 @@ function providerFetch(tokenFactory){
 }
 async function finish(env,tx,sub='candidate-1',nonce=tx.nonce){
  const callback=new Request(origin+'/auth/callback?'+new URLSearchParams({state:tx.state,code:'auth-code'}),{headers:{cookie:tx.cookie}});
- const response=await finishLogin(callback,env,{fetcher:providerFetch(()=>issueToken(sub,nonce))});
+ const email=sub==='candidate-1'?'candidate@example.com':sub+'@example.com';
+ const response=await finishLogin(callback,env,{fetcher:providerFetch(()=>issueToken(sub,nonce,{email}))});
  const cookies=response.headers.getSetCookie();
  const sessionLine=cookies.find(c=>c.startsWith('__Host-oc_session='));
  assert.ok(sessionLine);return {response,cookie:sessionLine.split(';')[0],cookies};

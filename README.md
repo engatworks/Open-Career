@@ -111,3 +111,9 @@ The multi-user source now supports [versioned OCV2 CV encryption and rotation](d
 These capabilities require a **real versioned keyring stored in hosting secrets**, the additive D1 migration `0008_lifecycle_maintenance`, and a trusted separately deployed scheduler for garbage collection. No real user CVs have been bulk re-encrypted, deleted, exported or moved by these source changes. The old `/api/v2/export` endpoint is retained only as a **partial** legacy export, and a live-data export is explicitly **not** an atomic multi-table snapshot.
 
 Before commercial registrations or customer billing: validate OIDC, actual Cloudflare D1/R2 behavior, backups/key custody, complete privacy-retention workflows, independent security assessment and support operations. Review the [senior engineering audit](docs/SENIOR_ENGINEERING_AUDIT_2026-10-21.md) and [commercial beta gates](docs/COMMERCIAL_BETA_GATES.md).
+
+## Safe tenant identity continuity (migration required)
+
+A new immutable signed-OIDC **issuer + subject → tenant ID** registry prevents already-linked accounts from changing identity when the tenant-HMAC derivation secret is rotated. Deployment requires additive `0009_stable_identities`, successful linking of *all existing active users while retaining the old derivation secret*, and a read-only mapping-coverage check before rotation. Unmapped legacy accounts require identity-verified operator reconciliation; email equality **never** automatically transfers one account to another.
+
+See [stable identity rotation procedures](docs/STABLE_IDENTITY_ROTATION.md). No live derivation-key rotation or existing-account migration has been executed.

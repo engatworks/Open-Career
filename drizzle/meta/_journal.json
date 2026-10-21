@@ -64,6 +64,13 @@
       "when": 1792602600000,
       "tag": "0008_lifecycle_maintenance",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792604400000,
+      "tag": "0009_stable_identities",
+      "breakpoints": true
     }
   ]
 }

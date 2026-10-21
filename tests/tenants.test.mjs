@@ -313,3 +313,38 @@ test('Orphan cleanup refuses unknown object-age metadata rather than deleting re
  assert.equal((await sweepTenantOrphanCVs(env,a.id)).deleted,0);
  assert.ok(env.BUCKET.objects.has(k));
 });
+
+test('Verified OIDC issuer+subject preserves the exact tenant account through derivation key rotation',async()=>{
+ const env=storage(),candidateToken=await token('stable-subject',{email:'candidate-stable@example.com',email_verified:true});
+ const req=new Request('https://career.example.com/api/v2/me',{headers:{authorization:'Bearer '+candidateToken}});
+ const before=await authenticate(req,{...config,DB:env.DB},{fetcher:JWKS});
+ const owner=new TenantWorkspace(env,before);await owner.onboard();await owner.setProfile(profile('Persistent Career'));
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_identities WHERE tenant_id=?").get(before.tenantId).n,1);
+ const nextSecret=Buffer.alloc(32,89).toString('base64url');
+ const after=await authenticate(req,{...config,DB:env.DB,OPENCAREER_TENANT_SECRET:nextSecret},{fetcher:JWKS});
+ assert.equal(after.tenantId,before.tenantId);
+ const restored=new TenantWorkspace(env,after);
+ assert.equal((await restored.profile()).name,'Persistent Career');
+ await restored.onboard();
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_identities WHERE tenant_id=?").get(before.tenantId).n,1);
+ const another=await token('different-subject',{email:'candidate-stable@example.com',email_verified:true});
+ await assert.rejects(authenticate(new Request('https://career.example.com/api/v2/me',{headers:{authorization:'Bearer '+another}}),{...config,DB:env.DB,OPENCAREER_TENANT_SECRET:nextSecret},{fetcher:JWKS}),error=>error.status===409&&/reconciliation/.test(error.message));
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_accounts").get().n,1);
+});
+test('An unmapped historical account with the same verified email cannot be duplicated after a secret rotation',async()=>{
+ const env=storage(),t=await token('pre-migration-user',{email:'legacy@example.com',email_verified:true});
+ const req=new Request('https://career.example.com/api/v2/me',{headers:{authorization:'Bearer '+t}});
+ const initial=await authenticate(req,{...config,DB:env.DB},{fetcher:JWKS});
+ env.sqlite.prepare("INSERT INTO tenant_accounts(id,email,status,created_at,last_seen_at) VALUES(?,?,'active','2026-10-21','2026-10-21')").run(initial.tenantId,'legacy@example.com');
+ const rotated=Buffer.alloc(32,75).toString('base64url');
+ await assert.rejects(authenticate(req,{...config,DB:env.DB,OPENCAREER_TENANT_SECRET:rotated},{fetcher:JWKS}),error=>error.status===409);
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_accounts").get().n,1);
+});
+test('Deleting a user cascades their persisted provider identity mapping without touching others',async()=>{
+ const env=storage(),a=new TenantWorkspace(env,await principal('erase-linked-a')),b=new TenantWorkspace(env,await principal('erase-linked-b'));
+ await a.onboard();await b.onboard();
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_identities").get().n,2);
+ await a.deleteAccount('DELETE MY ACCOUNT');
+ assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tenant_identities").get().n,1);
+ assert.equal(env.sqlite.prepare("SELECT tenant_id FROM tenant_identities").get().tenant_id,b.id);
+});

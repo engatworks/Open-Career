@@ -126,3 +126,12 @@ export const tenantMaintenance=sqliteTable('tenant_maintenance',{
  last_orphan_cursor:text('last_orphan_cursor'),
  last_orphan_deleted:integer('last_orphan_deleted').notNull().default(0),
 },t=>[index('tenant_maintenance_scan').on(t.last_orphan_scan_at)]);
+
+export const tenantIdentities=sqliteTable('tenant_identities',{
+ id:text('id').primaryKey(),
+ tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ issuer:text('issuer').notNull(),subject:text('subject').notNull(),created_at:text('created_at').notNull(),
+},t=>[
+ uniqueIndex('tenant_identities_external').on(t.issuer,t.subject),
+ index('tenant_identities_owner').on(t.tenant_id),
+]);
