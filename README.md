@@ -85,3 +85,11 @@ The sign-in backend uses OpenID Connect Authorization Code + S256 PKCE with one-
 Public v2 job discovery uses `GET /api/v2/ats/jobs` with signed tenant identity and atomic rate limits. `OPENCAREER_BETA_EMAIL_ALLOWLIST` restricts first-time registrations to verified invitees; both OAuth callback and direct REST/MCP onboarding enforce it. **Do not deploy this change to the current owner-private Site without updating the explicit access-mode setting first.**
 
 Full details, comparisons, rollout and commercial go/no-go gates: [Commercial Beta Gates](docs/COMMERCIAL_BETA_GATES.md) and [Security Policy](SECURITY.md). This is source hardening, not a public launch or claim of compliance.
+
+## Tenant employer watchlists (pre-release)
+
+Multi-user workspaces can now save verified-by-user Greenhouse, Lever and Ashby employer boards, retain observation history, and distinguish new listings on later rechecks. The first successful scan establishes a baseline rather than claiming all existing jobs are new. Each owner can opt in or out of background checks per board; no applicant documents, email outreach, portal accounts or application submissions are sent from the watch engine.
+
+The repository now includes a tightly bounded, secret-protected `POST /api/internal/watch-scan` entrypoint for a **future trusted cloud schedule**. It checks at most three explicitly opted-in boards per invocation. It is **not yet scheduled in a deployed production environment** and does not send email alerts. See [employer monitoring documentation](docs/EMPLOYER_WATCHLISTS.md).
+
+This source capability must not be deployed publicly until the [commercial release gates](docs/COMMERCIAL_BETA_GATES.md) are independently validated, including owner/private data isolation, real OIDC accounts, staging database and storage, abuse controls and privacy compliance.
