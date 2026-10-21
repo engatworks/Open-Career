@@ -19,6 +19,7 @@ const tools=[
  {name:'my_observed_jobs',description:'List your own observed public ATS jobs, optionally filtered to new sightings.',inputSchema:object({status:{type:'string',enum:['new','known','seen']},limit:{type:'integer'}}),annotations:{readOnlyHint:true}},
  {name:'save_employer_board',description:'Subscribe to a user-verified public ATS employer board; sources are not proof of active vacancies.',inputSchema:object({provider:{type:'string',enum:['greenhouse','lever','ashby']},board:str,region:{type:'string',enum:['global','eu']},label:str},['provider','board','label'])},
  {name:'scan_employer_board',description:'Recheck one saved employer board and record newly observed jobs. Requires a board ID and 10-minute cooldown; never applies.',inputSchema:object({id:str},['id'])},
+ {name:'set_employer_scan_consent',description:'Opt into or out of background public-job checks on one saved board. Only effective once a trusted scheduler is configured.',inputSchema:object({id:str,enabled:{type:'boolean'}},['id','enabled'])},
  {name:'acknowledge_job',description:'Mark one newly detected job as seen; does not submit an application.',inputSchema:object({job_key:str},['job_key'])},
  {name:'my_ats_applications',description:'List only the authenticated user ATS application records.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'discover_public_ats_jobs_v2',description:'Read only public job listings from Greenhouse, Lever or Ashby. This never applies for a job.',inputSchema:object({provider:{type:'string',enum:['greenhouse','lever','ashby']},board:str,region:{type:'string',enum:['global','eu']},query:str,limit:{type:'integer'}},['provider','board']),annotations:{readOnlyHint:true}},
@@ -65,6 +66,7 @@ export async function POST(request:Request){
    case 'scan_employer_board':
     await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
     result=await(new BoardWatch(env.DB,identity.tenantId)).scan(a.id);break;
+   case 'set_employer_scan_consent':result=await(new BoardWatch(env.DB,identity.tenantId)).setAutoScan(a.id,a.enabled);break;
    case 'acknowledge_job':result=await(new BoardWatch(env.DB,identity.tenantId)).markSeen(a.job_key);break;
    case 'my_ats_applications':result={items:await(await workspace.applications()).list()};break;
    case 'discover_public_ats_jobs_v2':
