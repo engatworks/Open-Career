@@ -1,3 +1,4 @@
+import {publicFailure} from '@/lib/public-errors.mjs';
 import {env} from 'cloudflare:workers';
 import {authenticate,IdentityError} from '@/lib/tenant-identity.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
@@ -86,7 +87,7 @@ export async function POST(request:Request){
   }
   return out(id,result);
  }catch(error){
-  const status=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:400;
-  return Response.json({jsonrpc:'2.0',id,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{status,headers:{'Cache-Control':'private, no-store'}});
+  const failure=publicFailure(error);
+  return Response.json({jsonrpc:'2.0',id,result:{content:[{type:'text',text:failure.message}],isError:true}},{status:failure.status,headers:{'Cache-Control':'private, no-store'}});
  }
 }
