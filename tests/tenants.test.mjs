@@ -191,3 +191,19 @@ test('Deletion refuses unexpected object ownership and does not remove other use
  assert.equal(env.BUCKET.objects.size,1);
  assert.deepEqual(Buffer.from((await b.readCV()).bytes),Buffer.from(cv));
 });
+
+test('Profile revision control prevents lost updates from multiple tabs and MCP callers',async()=>{
+ const env=storage(),owner=new TenantWorkspace(env,await principal('candidate-profile-a'));
+ await owner.onboard();
+ const created=await owner.setProfile(profile('First State'));
+ assert.equal(created.revision,1);
+ const revised=await owner.setProfile({...profile('Second State'),expected_revision:1});
+ assert.equal(revised.revision,2);
+ assert.equal(revised.name,'Second State');
+ await assert.rejects(owner.setProfile({...profile('Stale Edit'),expected_revision:1}),/another session/);
+ await assert.rejects(owner.setProfile(profile('Blind Overwrite')),/another session/);
+ assert.equal((await owner.profile()).name,'Second State');
+ await assert.rejects(owner.setProfile({...profile('Wrong Field'),expected_revision:2,updated_at:'forged'}),/Unsupported profile field/);
+ const again=await owner.setProfile({...profile('Third State'),expected_revision:2});
+ assert.equal(again.revision,3);
+});
