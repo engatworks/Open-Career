@@ -1,12 +1,16 @@
 import { env } from 'cloudflare:workers';
 import { Career } from '@/lib/career.mjs';
+import {legacyAllowed} from '@/lib/release-security.mjs';
 import { discoverATSJobs } from '@/lib/ats-discovery.mjs';
 export const dynamic='force-dynamic';
 
 function response(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});}
 async function bounded(request:Request,limit=200000){const reader=request.body?.getReader();if(!reader)throw Error('Request body missing');const parts:Uint8Array[]=[];let total=0;while(true){const {value,done}=await reader.read();if(done)break;total+=value.length;if(total>limit){await reader.cancel();throw Error('Request body too large');}parts.push(value);}const bytes=new Uint8Array(total);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return bytes;}
 async function json(request:Request){return JSON.parse(new TextDecoder().decode(await bounded(request)));}
-async function handler(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const career=new Career(env);
+async function handler(request:Request){
+ // The legacy API owns a single user's CV and Gmail outreach data. Never expose on a multi-user host.
+ if(!legacyAllowed(env))return response({error:'Not found'},404);
+ try{const url=new URL(request.url),path=url.pathname.slice(5),method=request.method;const origin=request.headers.get('origin');if(origin&&origin!==url.origin)return response({error:'Cross-origin access refused'},403);const career=new Career(env);
  if(method==='GET'){
   if(path==='ats/jobs')return response(await discoverATSJobs({provider:url.searchParams.get('provider'),board:url.searchParams.get('board'),region:url.searchParams.get('region')||'global',query:url.searchParams.get('q')||'',limit:Number(url.searchParams.get('limit')||50)}));
   if(path==='companies')return response(await career.contacts().companies(Object.fromEntries(url.searchParams)));
