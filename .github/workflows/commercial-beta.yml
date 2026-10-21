@@ -1,0 +1,53 @@
+name: Commercial beta safety gates
+
+on:
+  pull_request:
+    paths:
+      - 'lib/release-security.mjs'
+      - 'lib/browser-auth.mjs'
+      - 'app/api/**'
+      - 'app/mcp/**'
+      - 'app/auth/**'
+      - 'app/page.tsx'
+      - 'app/join/**'
+      - 'db/schema.ts'
+      - 'drizzle/**'
+      - 'tests/release-security.test.mjs'
+      - '.github/workflows/commercial-beta.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/release-security.mjs'
+      - 'lib/browser-auth.mjs'
+      - 'app/api/**'
+      - 'app/mcp/**'
+      - 'app/auth/**'
+      - 'app/page.tsx'
+      - 'app/join/**'
+      - 'db/schema.ts'
+      - 'drizzle/**'
+      - 'tests/release-security.test.mjs'
+      - '.github/workflows/commercial-beta.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Security regression tests
+        run: node --test tests/release-security.test.mjs tests/browser-auth.test.mjs tests/tenants.test.mjs
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check Drizzle migrations
+        run: node node_modules/drizzle-kit/bin.cjs check
+      - name: Run existing cloud and ATS tests
+        run: node --test tests/ats.test.mjs tests/cloud.test.mjs
+      - name: Validate TypeScript
+        run: node node_modules/typescript/bin/tsc --noEmit

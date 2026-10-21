@@ -91,3 +91,8 @@ export const browserSessions=sqliteTable('browser_sessions',{
  tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
  created_at:text('created_at').notNull(),expires_at:text('expires_at').notNull(),
 },t=>[index('browser_sessions_tenant').on(t.tenant_id,t.expires_at),index('browser_sessions_expiry').on(t.expires_at)]);
+
+export const requestLimits=sqliteTable('request_limits',{
+ bucket:text('bucket').primaryKey(),count:integer('count').notNull().default(0),
+ expires_at:integer('expires_at').notNull(),
+},t=>[index('request_limits_expiry').on(t.expires_at)]);
