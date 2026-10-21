@@ -1,0 +1,37 @@
+name: Temporary audited lockfile refresh
+
+on:
+  push:
+    branches:
+      - audit/p0-data-integrity-recovery-20261021
+    paths:
+      - '.github/workflows/_repair-pnpm-lock.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/p0-data-integrity-recovery-20261021
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Resolve patched dependencies and regenerate pnpm lock
+        run: corepack pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts
+      - name: Commit lockfile update to this audit branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo 'Lockfile already current.'
+          else
+            git commit -m 'security: regenerate lockfile for patched runtime dependencies'
+            git push origin HEAD:refs/heads/audit/p0-data-integrity-recovery-20261021
+          fi
