@@ -2,6 +2,7 @@ import {env} from 'cloudflare:workers';
 import {authenticate,IdentityError} from '@/lib/tenant-identity.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
+import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
 export const dynamic='force-dynamic';
 const str={type:'string'};
 const object=(properties:Record<string,unknown>,required:string[]=[])=>({type:'object',properties,required,additionalProperties:false});
@@ -23,6 +24,7 @@ const out=(id:unknown,result:unknown)=>Response.json({jsonrpc:'2.0',id,result:{c
 export async function POST(request:Request){
  let id:unknown=null;
  try{
+  assertMultiuserAllowed(env);
   if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return Response.json({error:'Cross-origin access refused'},{status:403});
   const identity=await authenticate(request,env);
   if(Number(request.headers.get('content-length')||0)>50000)throw Error('MCP request exceeds allowed size');
@@ -37,16 +39,25 @@ export async function POST(request:Request){
   if(rpc.method==='tools/list')return Response.json({jsonrpc:'2.0',id,result:{tools}});
   if(rpc.method!=='tools/call')throw Error('Unknown MCP method');
   const workspace=new TenantWorkspace(env,identity),a=rpc.params?.arguments??{};let result:unknown;
+  if(!['workspace_account','get_candidate_profile','cv_attachment_status','my_contacts','my_ats_applications','discover_public_ats_jobs_v2','onboard_workspace'].includes(rpc.params?.name)){
+   await workspace.account();await throttleTenant(env,identity,'workspace_write',80,{intervalSeconds:3600});
+  }
   switch(rpc.params?.name){
    case 'workspace_account':result=await workspace.me();break;
-   case 'onboard_workspace':result=await workspace.onboard();break;
+   case 'onboard_workspace':
+    await throttleTenant(env,identity,'onboard',6,{intervalSeconds:3600});
+    await assertOnboardingAllowed(env,identity);
+    result=await workspace.onboard();break;
    case 'get_candidate_profile':result=await workspace.profile();break;
    case 'save_candidate_profile':result=await workspace.setProfile(a.profile);break;
    case 'cv_attachment_status':result=await workspace.cvInfo();break;
    case 'my_contacts':result={items:await workspace.contacts()};break;
    case 'add_contact_candidate':result=await workspace.addContact(a);break;
    case 'my_ats_applications':result={items:await(await workspace.applications()).list()};break;
-   case 'discover_public_ats_jobs_v2':result=await discoverATSJobs(a);break;
+   case 'discover_public_ats_jobs_v2':
+    await workspace.account();
+    await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
+    result=await discoverATSJobs(a);break;
    case 'track_ats_job':result=await(await workspace.applications()).track(a.job);break;
    case 'prepare_my_application':{
     const cv=await workspace.cvInfo();if(!cv||cv.sha256!==a.cv_sha256)throw Error('CV fingerprint mismatch');
@@ -60,7 +71,7 @@ export async function POST(request:Request){
   }
   return out(id,result);
  }catch(error){
-  const status=error instanceof IdentityError?error.status:400;
+  const status=error instanceof AccessError?error.status:error instanceof IdentityError?error.status:400;
   return Response.json({jsonrpc:'2.0',id,result:{content:[{type:'text',text:error instanceof Error?error.message:'Action failed'}],isError:true}},{status,headers:{'Cache-Control':'private, no-store'}});
  }
 }
