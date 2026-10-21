@@ -37,7 +37,7 @@ The v2 MCP endpoint `POST /mcp/v2` exposes strictly tenant-scoped discovery/prof
 
 ## Identity onboarding remains outstanding
 
-This repository has a verified-token API but does not yet contain a production OAuth/OIDC sign-in page, OAuth authorization code + PKCE setup, user session management, account linking across identity providers, or email verification user experience. Users cannot self-register through the current legacy UI.
+The source now includes an alpha `/join` onboarding UI, an OIDC Authorization Code + PKCE backend and revocable HttpOnly browser sessions. A real production OAuth/OIDC identity-provider registration, live credentials, hosted staging verification, account linking across providers, email-verification UX and general availability have **not** been completed. The owner-private legacy UI remains unchanged. See `docs/BROWSER_LOGIN_IMPLEMENTATION.md` for the new flow and rollout gates.
 
 The private Cloudflare/ChatGPT Sites deployment was **not** updated simply by merging GitHub. Any production rollout must:
 
