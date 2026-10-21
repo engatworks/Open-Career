@@ -34,7 +34,7 @@ export const companyInventory=sqliteTable('company_inventory',{
  provider:text('provider').notNull(),source_url:text('source_url').notNull(),attribution:text('attribution').notNull().default(''),updated_at:text('updated_at').notNull(),
 });
 
-\n// New application ledger only: no legacy outreach tables are exposed to additional tenants.
+// New application ledger only: no legacy outreach tables are exposed to additional tenants.
 export const atsApplications=sqliteTable('ats_applications',{
  id:text('id').primaryKey(),tenant_id:text('tenant_id').notNull(),
  job_key:text('job_key').notNull(),provider:text('provider').notNull(),board:text('board').notNull(),
