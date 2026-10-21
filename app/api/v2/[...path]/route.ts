@@ -60,6 +60,9 @@ async function handle(request:Request){
     await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
     const input=await json(request);return respond(await watch.scan(input.id));
    }
+   if(request.method==='POST'&&path==='boards/auto'){
+    const input=await json(request);return respond(await watch.setAutoScan(input.id,input.enabled));
+   }
    if(request.method==='POST'&&path==='boards/seen'){
     const input=await json(request);return respond(await watch.markSeen(input.job_key));
    }
