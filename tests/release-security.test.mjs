@@ -75,3 +75,21 @@ test('Misconfigured request limits are rejected rather than silently unlimited',
  await assert.rejects(consumeLimit(e,{scope:'ats',owner:'short',max:30}),/Invalid/);
  await assert.rejects(consumeLimit(e,{scope:'ats',owner:'long-enough',max:0}),/Invalid/);
 });
+
+test('Source-level owner-private boundary blocks legacy API and MCP before accessing personal data',()=>{
+ const api=fs.readFileSync('app/api/[...path]/route.ts','utf8');
+ const mcp=fs.readFileSync('app/mcp/route.ts','utf8');
+ const homepage=fs.readFileSync('app/page.tsx','utf8');
+ assert.ok(api.indexOf('if(!legacyAllowed(env))')>0);
+ assert.ok(api.indexOf('if(!legacyAllowed(env))')<api.indexOf('new Career(env)'));
+ assert.ok(mcp.indexOf('if(!legacyAllowed(env))')>0);
+ assert.ok(mcp.indexOf('if(!legacyAllowed(env))')<mcp.indexOf('request.json()'));
+ assert.ok(homepage.includes("redirect('/join')"));
+});
+test('Public ATS search is authenticated and no longer uses the owner-private API route',()=>{
+ const ui=fs.readFileSync('app/join/join-client.tsx','utf8');
+ const v2=fs.readFileSync('app/api/v2/[...path]/route.ts','utf8');
+ assert.ok(ui.includes('/api/v2/ats/jobs'));
+ assert.ok(v2.includes("if(request.method==='GET'&&path==='ats/jobs')"));
+ assert.ok(v2.includes("throttleTenant(env,identity,'ats_jobs'"));
+});

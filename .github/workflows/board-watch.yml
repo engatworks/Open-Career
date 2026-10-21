@@ -1,0 +1,53 @@
+name: Tenant job watchlists and regressions
+
+on:
+  pull_request:
+    paths:
+      - 'lib/board-watch.mjs'
+      - 'lib/watch-scheduler.mjs'
+      - 'app/api/internal/watch-scan/**'
+      - 'lib/tenant-workspace.mjs'
+      - 'app/join/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/**'
+      - 'tests/board-watch.test.mjs'
+      - '.github/workflows/board-watch.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/board-watch.mjs'
+      - 'lib/watch-scheduler.mjs'
+      - 'app/api/internal/watch-scan/**'
+      - 'lib/tenant-workspace.mjs'
+      - 'app/join/**'
+      - 'app/api/v2/**'
+      - 'app/mcp/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/**'
+      - 'tests/board-watch.test.mjs'
+      - '.github/workflows/board-watch.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  watchlist-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Tenant employer boards and new job detection
+        run: node --test tests/board-watch.test.mjs tests/release-security.test.mjs tests/tenants.test.mjs
+      - name: Install frozen project dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Validate database migrations
+        run: node node_modules/drizzle-kit/bin.cjs check
+      - name: Existing ATS, browser and cloud tests
+        run: node --test tests/ats.test.mjs tests/browser-auth.test.mjs tests/cloud.test.mjs
+      - name: Type-check application
+        run: node node_modules/typescript/bin/tsc --noEmit
