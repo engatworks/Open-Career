@@ -52,3 +52,13 @@ The Research screen offers the same page explorer. Run reports and the dashboard
 ### Contact database
 
 The private Contact database page searches persistent people/address candidates and a separate company inventory. Bounded original-page collection retains provenance; permitted CSV imports never confer delivery eligibility. See [Database workflow](docs/DATABASE_WORKFLOW.md).
+
+## Experimental ATS job discovery (merged 21 October 2026)
+
+The source now includes read-only official job-board discovery for **Greenhouse, Lever and Ashby**. The private deployment must be updated separately; committing source does not publish a new Site version.
+
+- Private API: `GET /api/ats/jobs?provider=greenhouse&board=BOARD_NAME` (also `lever` or `ashby`; Lever supports `region=eu`).
+- Native MCP: `discover_public_ats_jobs` with `{provider,board,query?,region?,limit?}`.
+- Application tracking foundation: tenant-scoped `ApplicationLedger`, additive SQL migration, reviewed CV/form/answer fingerprints, consent-based approval, one submission attempt and uncertain-state quarantine. **No write endpoints are exposed.**
+
+This is not yet a public multi-user agent or an automated portal applicant. Existing candidate profiles, CVs, contact records and outreach remain owner-private and must be redesigned with authenticated tenant isolation before user registration can safely be opened. ATS account signup, browser form filling, MFA handoff and application submission are not yet implemented. See [implementation details](docs/ATS_IMPLEMENTATION.md) and [roadmap](docs/MULTIUSER_ATS_ROADMAP.md).
