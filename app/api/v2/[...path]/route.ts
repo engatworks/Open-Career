@@ -1,5 +1,6 @@
 import {env} from 'cloudflare:workers';
-import {authenticate,IdentityError} from '@/lib/tenant-identity.mjs';
+import {IdentityError} from '@/lib/tenant-identity.mjs';
+import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
@@ -18,7 +19,7 @@ async function handle(request:Request){
  try{
   const url=new URL(request.url),path=url.pathname.replace(/^\/api\/v2\/?/,'');
   if(request.headers.get('origin')&&request.headers.get('origin')!==url.origin)return respond({error:'Cross-origin requests are not permitted'},403);
-  const identity=await authenticate(request,env);
+  const identity=await identityForAPI(request,env);
   const workspace=new TenantWorkspace(env,identity);
   if(request.method==='POST'&&path==='onboard')return respond({account:await workspace.onboard(),tenant_id:identity.tenantId},201);
   if(request.method==='GET'&&path==='me'){
@@ -47,7 +48,7 @@ async function handle(request:Request){
    return respond({application:await(await workspace.applications()).approve(input.id,input)});
   }
   if(request.method==='POST'&&path==='applications/cancel'){const input=await json(request);return respond({application:await(await workspace.applications()).cancel(input.id)});}
-  if(request.method==='GET'&&path==='export')return respond(await workspace.exportData());
+  if(request.method==='GET'&&path==='export')return Response.json(await workspace.exportData(),{headers:{...headers,'Content-Disposition':'attachment; filename="open-career-export.json"'}});
   if(request.method==='DELETE'&&path==='account'){const data=await json(request);return respond(await workspace.deleteAccount(data.confirm));}
   return respond({error:'Unknown API endpoint'},404);
  }catch(error){

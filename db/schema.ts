@@ -81,3 +81,13 @@ export const tenantEvents=sqliteTable('tenant_events',{
  tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
  at:text('at').notNull(),kind:text('kind').notNull(),detail:text('detail').notNull(),
 },t=>[index('tenant_events_owner').on(t.tenant_id,t.at)]);
+
+export const loginTransactions=sqliteTable('login_transactions',{
+ state_hash:text('state_hash').primaryKey(),code_verifier:text('code_verifier').notNull(),
+ nonce:text('nonce').notNull(),expires_at:text('expires_at').notNull(),
+},t=>[index('login_transactions_expiry').on(t.expires_at)]);
+export const browserSessions=sqliteTable('browser_sessions',{
+ token_hash:text('token_hash').primaryKey(),
+ tenant_id:text('tenant_id').notNull().references(()=>tenantAccounts.id,{onDelete:'cascade'}),
+ created_at:text('created_at').notNull(),expires_at:text('expires_at').notNull(),
+},t=>[index('browser_sessions_tenant').on(t.tenant_id,t.expires_at),index('browser_sessions_expiry').on(t.expires_at)]);

@@ -1,0 +1,51 @@
+name: Browser onboarding and security
+
+on:
+  pull_request:
+    paths:
+      - 'lib/browser-auth.mjs'
+      - 'lib/tenant-identity.mjs'
+      - 'app/auth/**'
+      - 'app/join/**'
+      - 'app/api/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/0005_browser_oidc.sql'
+      - 'drizzle/meta/**'
+      - 'tests/browser-auth.test.mjs'
+      - '.github/workflows/browser-login.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/browser-auth.mjs'
+      - 'lib/tenant-identity.mjs'
+      - 'app/auth/**'
+      - 'app/join/**'
+      - 'app/api/v2/**'
+      - 'db/schema.ts'
+      - 'drizzle/0005_browser_oidc.sql'
+      - 'drizzle/meta/**'
+      - 'tests/browser-auth.test.mjs'
+      - '.github/workflows/browser-login.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: OIDC login and session security tests
+        run: node --test tests/browser-auth.test.mjs tests/tenants.test.mjs
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Validate database migration history
+        run: node node_modules/drizzle-kit/bin.cjs check
+      - name: Run ATS and legacy cloud regression suites
+        run: node --test tests/ats.test.mjs tests/cloud.test.mjs
+      - name: Type-check browser UI and server
+        run: node node_modules/typescript/bin/tsc --noEmit
