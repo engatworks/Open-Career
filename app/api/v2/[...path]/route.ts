@@ -4,6 +4,7 @@ import {IdentityError} from '@/lib/tenant-identity.mjs';
 import {identityForAPI} from '@/lib/browser-auth.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
 import {TenantExport} from '@/lib/tenant-export.mjs';
+import {activeCVKeyId} from '@/lib/cv-crypto.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
 import {BoardWatch} from '@/lib/board-watch.mjs';
 import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
@@ -72,6 +73,15 @@ async function handle(request:Request){
   if(request.method==='GET'&&path==='profile')return respond({profile:await workspace.profile()});
   if(request.method==='POST'&&path==='profile')return respond({profile:await workspace.setProfile(await json(request))});
   if(request.method==='GET'&&path==='cv/info')return respond({cv:await workspace.cvInfo()});
+  if(request.method==='GET'&&path==='cv/key-status'){
+   await workspace.account();
+   const current=activeCVKeyId(env);
+   return respond({versioned_encryption_available:!!current,key_id:current});
+  }
+  if(request.method==='POST'&&path==='cv/rekey'){
+   await throttleTenant(env,identity,'cv_rekey',8,{intervalSeconds:3600});
+   return respond(await workspace.rotateCVKey());
+  }
   if(request.method==='POST'&&path==='cv')return respond({cv:await workspace.uploadCV(await bounded(request,5_000_000))},201);
   if(request.method==='GET'&&path==='cv'){
    const {bytes,sha256}=await workspace.readCV();
