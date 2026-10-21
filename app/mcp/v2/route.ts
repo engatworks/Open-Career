@@ -2,6 +2,7 @@ import {env} from 'cloudflare:workers';
 import {authenticate,IdentityError} from '@/lib/tenant-identity.mjs';
 import {TenantWorkspace} from '@/lib/tenant-workspace.mjs';
 import {discoverATSJobs} from '@/lib/ats-discovery.mjs';
+import {BoardWatch} from '@/lib/board-watch.mjs';
 import {AccessError,assertMultiuserAllowed,assertOnboardingAllowed,throttleTenant} from '@/lib/release-security.mjs';
 export const dynamic='force-dynamic';
 const str={type:'string'};
@@ -14,6 +15,11 @@ const tools=[
  {name:'cv_attachment_status',description:'Read your own encrypted CV fingerprint and size, but not the private file.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'my_contacts',description:'List only the authenticated user contact candidates. These are not eligible for automatic sending.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'add_contact_candidate',description:'Save one explicitly sourced, unverified professional contact within your own workspace.',inputSchema:object({email:str,name:str,company:str,role:str,source_url:str},['email'])},
+ {name:'my_employer_boards',description:'List your own saved Greenhouse Lever and Ashby employer boards and count new observed listings.',inputSchema:object({}),annotations:{readOnlyHint:true}},
+ {name:'my_observed_jobs',description:'List your own observed public ATS jobs, optionally filtered to new sightings.',inputSchema:object({status:{type:'string',enum:['new','known','seen']},limit:{type:'integer'}}),annotations:{readOnlyHint:true}},
+ {name:'save_employer_board',description:'Subscribe to a user-verified public ATS employer board; sources are not proof of active vacancies.',inputSchema:object({provider:{type:'string',enum:['greenhouse','lever','ashby']},board:str,region:{type:'string',enum:['global','eu']},label:str},['provider','board','label'])},
+ {name:'scan_employer_board',description:'Recheck one saved employer board and record newly observed jobs. Requires a board ID and 10-minute cooldown; never applies.',inputSchema:object({id:str},['id'])},
+ {name:'acknowledge_job',description:'Mark one newly detected job as seen; does not submit an application.',inputSchema:object({job_key:str},['job_key'])},
  {name:'my_ats_applications',description:'List only the authenticated user ATS application records.',inputSchema:object({}),annotations:{readOnlyHint:true}},
  {name:'discover_public_ats_jobs_v2',description:'Read only public job listings from Greenhouse, Lever or Ashby. This never applies for a job.',inputSchema:object({provider:{type:'string',enum:['greenhouse','lever','ashby']},board:str,region:{type:'string',enum:['global','eu']},query:str,limit:{type:'integer'}},['provider','board']),annotations:{readOnlyHint:true}},
  {name:'track_ats_job',description:'Save an ATS vacancy in your own workspace without applying.',inputSchema:object({job:{type:'object'}},['job'])},
@@ -39,7 +45,7 @@ export async function POST(request:Request){
   if(rpc.method==='tools/list')return Response.json({jsonrpc:'2.0',id,result:{tools}});
   if(rpc.method!=='tools/call')throw Error('Unknown MCP method');
   const workspace=new TenantWorkspace(env,identity),a=rpc.params?.arguments??{};let result:unknown;
-  if(!['workspace_account','get_candidate_profile','cv_attachment_status','my_contacts','my_ats_applications','discover_public_ats_jobs_v2','onboard_workspace'].includes(rpc.params?.name)){
+  if(!['workspace_account','get_candidate_profile','cv_attachment_status','my_contacts','my_ats_applications','my_employer_boards','my_observed_jobs','discover_public_ats_jobs_v2','onboard_workspace'].includes(rpc.params?.name)){
    await workspace.account();await throttleTenant(env,identity,'workspace_write',80,{intervalSeconds:3600});
   }
   switch(rpc.params?.name){
@@ -53,6 +59,13 @@ export async function POST(request:Request){
    case 'cv_attachment_status':result=await workspace.cvInfo();break;
    case 'my_contacts':result={items:await workspace.contacts()};break;
    case 'add_contact_candidate':result=await workspace.addContact(a);break;
+   case 'my_employer_boards':result={items:await(new BoardWatch(env.DB,identity.tenantId)).boards()};break;
+   case 'my_observed_jobs':result={items:await(new BoardWatch(env.DB,identity.tenantId)).listings({status:a.status||null,limit:a.limit||100})};break;
+   case 'save_employer_board':result=await(new BoardWatch(env.DB,identity.tenantId)).save(a);break;
+   case 'scan_employer_board':
+    await throttleTenant(env,identity,'ats_jobs',30,{intervalSeconds:600});
+    result=await(new BoardWatch(env.DB,identity.tenantId)).scan(a.id);break;
+   case 'acknowledge_job':result=await(new BoardWatch(env.DB,identity.tenantId)).markSeen(a.job_key);break;
    case 'my_ats_applications':result={items:await(await workspace.applications()).list()};break;
    case 'discover_public_ats_jobs_v2':
     await workspace.account();
