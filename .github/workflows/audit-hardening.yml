@@ -11,6 +11,11 @@ on:
       - 'app/mcp/v2/**'
       - 'app/join/**'
       - 'tests/**'
+      - 'ui/**'
+      - 'app/api/**'
+      - 'app/mcp/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/audit-hardening.yml'
   push:
     branches: [main]
@@ -20,6 +25,11 @@ on:
       - 'app/mcp/v2/**'
       - 'app/join/**'
       - 'tests/**'
+      - 'ui/**'
+      - 'app/api/**'
+      - 'app/mcp/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/audit-hardening.yml'
 
 permissions:
