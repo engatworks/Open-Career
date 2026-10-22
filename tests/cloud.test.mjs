@@ -23,7 +23,7 @@ test('reservation produces exact PDF and confirms real provider receipt once',as
 test('unknown delivery remains reserved and cannot be retried',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);await c.uncertain(r.reservation_token,'Timeout after provider request');assert.equal(await c.quota(),1);await assert.rejects(c.reserve(q.id),/unknown/);assert.equal((await c.list())[0].status,'needs_reconciliation');});
 test('Riyadh daily 25-send quota atomically resists concurrent reservations',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const ids=[];c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html.replaceAll('example.com',new URL(url).hostname),{headers:{'content-type':String(url).endsWith('/robots.txt')?'text/plain':'text/html'}});for(let i=1;i<=30;i++)ids.push((await c.queue(await packet(c,i))).id);const results=await Promise.allSettled(ids.map(id=>c.reserve(id)));assert.equal(results.filter(x=>x.status==='fulfilled').length,25);assert.equal(await c.quota(),25);});
 
-test('a sent message from a previous Riyadh day does not reduce today’s quota',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);await c.receipt({reservation_token:r.reservation_token,message_id:'1000000000000001'});await c.stmt('UPDATE outreach SET sent_at=? WHERE id=?','2020-01-01T00:00:00.000Z',q.id).run();assert.equal(await c.quota(),0);assert.equal((await c.status()).daily_cap,25);});
+test('a sent message from a previous Riyadh day does not reduce today’s quota',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);await c.receipt({reservation_token:r.reservation_token,message_id:'1000000000000001'});await c.stmt('UPDATE outreach SET sent_at=? WHERE id=?','2020-01-01T00:00:00.000Z',q.id).run();assert.equal(await c.quota(),0);assert.equal((await c.status()).daily_cap,50);assert.equal((await c.status()).daily_cap_per_campaign,25);});
 
 test('profile edits and opt-outs block send and preserve history',async()=>{const {c}=await setup();await c.setSettings({live_send_enabled:true});let q=await c.queue(await packet(c));await c.suppress('sara.ahmed@example.com','Not interested');assert.equal((await c.list())[0].status,'cancelled');await assert.rejects(c.queue(await packet(c)),/suppressed/);await assert.rejects(c.reserve(q.id),/processed/);});
 test('source parser excludes scripts/comments and exact evidence rejects inventions',async()=>{assert.equal(visibleText('<script>x="mailto:secret@corp.com"</script><!--hidden@example.com--><p>Actual &amp; public</p>'),'actual & public');const {c}=await setup();const p=await packet(c);p.company_fact.source_quote='Invented project fact unavailable';await assert.rejects(verifyEvidence(p,fetcher),/not found/);});
@@ -157,4 +157,20 @@ test('company bulk imports retain source attribution and do not invent people',a
  await db.importCompanies(p);await db.importCompanies(p);const result=await db.companies({q:'saudi'});assert.equal(result.total,1);assert.equal(result.items[0].attribution,'CC BY 4.0');assert.equal((await db.search()).total,0);
  await assert.rejects(db.importCompanies({...p,records:[{name:'Bad',website:'https://127.0.0.1'}]}),/public HTTPS/);
  assert.equal((await db.companies({q:"%' OR 1=1 --"})).total,0);
+});
+
+test('Ireland and Saudi have independent atomic 25/day quotas (50 total), not a shared cap',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});
+ c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\\nAllow: /':html.replaceAll('example.com',new URL(url).hostname),{headers:{'content-type':String(url).endsWith('/robots.txt')?'text/plain':'text/html'}});
+ const jobs=[];
+ for(let i=1;i<=60;i++){const p=await packet(c,i);p.campaign=i<=30?'ksa-engineering':'ireland-engineering';jobs.push((await c.queue(p)).id);}
+ const deliveries=await Promise.allSettled(jobs.map(id=>c.reserve(id)));
+ assert.equal(deliveries.filter(r=>r.status==='fulfilled').length,50);
+ assert.equal(await c.quota('ksa-engineering'),25);
+ assert.equal(await c.quota('ireland-engineering'),25);
+ assert.equal(await c.quota(),50);
+ const state=await c.status();
+ assert.equal(state.quota_by_campaign['ksa-engineering'].remaining,0);
+ assert.equal(state.quota_by_campaign['ireland-engineering'].remaining,0);
+ assert.equal(state.quota_remaining,0);
 });
