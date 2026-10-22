@@ -2,7 +2,7 @@
 
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
-The deployed Site provides D1 records, private R2 CV storage, source verification, immutable attachment fingerprints, dedupe, single-run tracking and a 25-send Riyadh calendar-day reservation cap. ChatGPT researches original public sources and writes messages. The native Gmail tool receives the exact multipart message returned by the tracker.
+The deployed Site provides D1 records, private R2 CV storage, source verification, immutable attachment fingerprints, dedupe, single-run tracking and independent atomic reservation caps of 25 Irish and 25 Saudi sends (50 total) per Riyadh calendar day. ChatGPT researches original public sources and writes messages. The native Gmail tool receives the exact multipart message returned by the tracker.
 
 ## Important operational distinction
 
