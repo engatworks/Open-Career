@@ -32,6 +32,7 @@ on:
       - 'pnpm-lock.yaml'
       - '.github/workflows/audit-hardening.yml'
 
+# Re-verify the exact locked Next.js security-patch version before any private publication.
 permissions:
   contents: read
 
