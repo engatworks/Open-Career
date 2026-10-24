@@ -97,7 +97,7 @@ const pdfFetch = bytes => async url => String(url).endsWith('/robots.txt')
  ? new Response('User-agent: *\nAllow: /') : new Response(bytes, {headers:{'content-type':'application/pdf'}});
 
 test('official PDF evidence supports inspection, queue and fresh reservation without changing CV',async()=>{
- const bytes=textPDF([['Sara Ahmed - Engineering Manager. Email: sara.ahmed@example.com','The new substation commissioning program has started.']]);
+ const bytes=textPDF([['Sara Ahmed - Engineering Manager. Email: sara.ahmed@example.com','The new substation commissioning program has started.','The relay testing phase includes supervised acceptance checks.']]);
  const f=pdfFetch(bytes), result=await inspectSource('https://example.com/contacts.pdf',f);
  assert.equal(result.source_format,'pdf');assert.equal(result.total_pages,1);assert.equal(result.source_sha256,await hash(bytes));
  assert.equal(result.contacts[0].email,'sara.ahmed@example.com');assert.equal(result.contacts[0].page,1);assert.equal(result.contacts[0].identity_verified,false);
@@ -112,7 +112,7 @@ test('PDF page boundaries cannot invent email ownership and changed PDF blocks r
  p.contact_role_quote='Sara Ahmed Engineering Manager';p.contact_email_quote='Sara Ahmed Engineering Manager sara.ahmed@example.com';
  const split=textPDF([['Sara Ahmed Engineering Manager'],['sara.ahmed@example.com','The new substation commissioning program has started']]);
  await assert.rejects(verifyEvidence(p,pdfFetch(split)),/email\/name/);
- c.fetcher=pdfFetch(textPDF([[p.contact_email_quote,p.company_fact.source_quote]]));
+ c.fetcher=pdfFetch(textPDF([[p.contact_email_quote,p.company_fact.source_quote,p.company_fact_secondary.source_quote]]));
  const q=await c.queue(p);await c.setSettings({live_send_enabled:true});c.fetcher=pdfFetch(split);
  await assert.rejects(c.reserve(q.id),/email\/name/);assert.equal(await c.quota(),0);
 });
