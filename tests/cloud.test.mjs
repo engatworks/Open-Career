@@ -12,10 +12,10 @@ class D1 {
 }
 class Bucket{constructor(){this.values=new Map();}async put(key,bytes){this.values.set(key,new Uint8Array(bytes));}async get(key){const data=this.values.get(key);return data?{arrayBuffer:async()=>data.slice().buffer}:null;}}
 const profile={name:'Test Candidate',target_roles:['Junior Electrical Engineer'],evidence:[{id:'panels',claim:'Assisted with supervised control-panel assembly and testing.'}]};
-const html='<p>Sara Ahmed — Engineering Manager. Email: sara.ahmed@example.com</p><p>The new substation commissioning program has started.</p>';
+const html='<p>Sara Ahmed — Engineering Manager. Email: sara.ahmed@example.com</p><p>The new substation commissioning program has started.</p><p>The relay testing phase includes supervised acceptance checks.</p>';
 const fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html,{headers:{'content-type':String(url).endsWith('/robots.txt')?'text/plain':'text/html'}});
 async function setup(){const c=new Career({DB:new D1(),BUCKET:new Bucket()},fetcher);await c.setProfile(profile);const cv=new TextEncoder().encode('%PDF-1.4 test');await c.uploadCV(cv);await c.saveConfig('verification',{background_send:true,attachment_sha256:await hash(cv)});return {c,cv};}
-async function packet(c,number=0){const cv=await c.config('cv');const d=number?'company'+number+'.com':'example.com';return {named_search:{queries:['site:'+d+' engineering manager'],sources:['https://'+d+'/team'],outcome:'Original team page binds the engineering manager to the individual work email.'},research_review:{company_review:'Original company source describes a substation commissioning program relevant to supervised junior panel support.',person_review:'Sara Ahmed is listed as Engineering Manager on the official team page together with the exact individual work email.',selection_reason:'Engineering work is relevant to junior panel assembly and testing support.',checked_at:new Date().toISOString(),sources:['https://'+d+'/team','https://'+d+'/news'],conflict_queries:['Sara Ahmed Example Power current employer'],conflict_outcome:'Reviewed current original team page; no conflicting employment evidence found.',unresolved_conflict:false,limitations:'No vacancy or mailbox deliverability independently established.'},company:'Example Power',company_domain:d,contact_name:'Sara Ahmed',contact_role:'Engineering Manager',email:'sara.ahmed@'+d,email_evidence:'exact_published',email_source_url:'https://'+d+'/team',contact_role_source:'https://'+d+'/team',contact_role_quote:'Sara Ahmed — Engineering Manager',contact_email_quote:'Sara Ahmed — Engineering Manager. Email: sara.ahmed@'+d,company_fact:{statement:'The new substation commissioning program has started',source_quote:'The new substation commissioning program has started',source_url:'https://'+d+'/news'},personalization_reason:'Published commissioning activity matches supervised panel experience',candidate_fact_ids:['panels'],subject:'Electrical engineering inquiry for substation work',body:'Dear Sara,\n\nThe new substation commissioning program has started, and this work caught my attention because of its relevance to electrical commissioning. I assisted with supervised control-panel assembly and testing. I am seeking a paid junior electrical engineering position and would appreciate an opportunity to discuss how this background may support the team. My CV is attached for your consideration, and I would be grateful for an introduction to the colleague responsible for suitable vacancies.\n\nKind regards,\nTest Candidate',cv_sha256:cv.sha256};}
+async function packet(c,number=0){const cv=await c.config('cv');const d=number?'company'+number+'.com':'example.com';return {named_search:{queries:['site:'+d+' engineering manager'],sources:['https://'+d+'/team'],outcome:'Original team page binds the engineering manager to the individual work email.'},research_review:{company_review:'Original company source describes a substation commissioning program relevant to supervised junior panel support.',person_review:'Sara Ahmed is listed as Engineering Manager on the official team page together with the exact individual work email.',selection_reason:'Engineering work is relevant to junior panel assembly and testing support.',checked_at:new Date().toISOString(),sources:['https://'+d+'/team','https://'+d+'/news'],conflict_queries:['Sara Ahmed Example Power current employer'],conflict_outcome:'Reviewed current original team page; no conflicting employment evidence found.',unresolved_conflict:false,limitations:'No vacancy or mailbox deliverability independently established.'},company:'Example Power',company_domain:d,contact_name:'Sara Ahmed',contact_role:'Engineering Manager',email:'sara.ahmed@'+d,email_evidence:'exact_published',email_source_url:'https://'+d+'/team',contact_role_source:'https://'+d+'/team',contact_role_quote:'Sara Ahmed — Engineering Manager',contact_email_quote:'Sara Ahmed — Engineering Manager. Email: sara.ahmed@'+d,company_fact:{statement:'The new substation commissioning program has started',source_quote:'The new substation commissioning program has started',source_url:'https://'+d+'/news'},company_fact_secondary:{statement:'The relay testing phase includes supervised acceptance checks',source_quote:'The relay testing phase includes supervised acceptance checks',source_url:'https://'+d+'/services'},personalization_reason:'Published commissioning activity matches supervised panel experience',candidate_fact_ids:['panels'],subject:'I have nothing to offer, but I want in',body:'Dear Sara,\n\nThe new substation commissioning program has started, and this work caught my attention because of its relevance to electrical commissioning. The relay testing phase includes supervised acceptance checks. I assisted with supervised control-panel assembly and testing. I am seeking a paid junior electrical engineering position and would appreciate an opportunity to discuss how this background may support the team. My CV is attached for your consideration, and I would be grateful for an introduction to the colleague responsible for suitable vacancies.\n\nKind regards,\nTest Candidate',cv_sha256:cv.sha256};}
 
 test('persistent CV roundtrip and changed fingerprint holds prepared message',async()=>{const {c,cv}=await setup();assert.equal(await hash(cv),(await c.context()).cv.sha256);const ctx=await c.context(true);assert.deepEqual(Buffer.from(ctx.cv_base64_url,'base64url'),Buffer.from(cv));const p=await packet(c),q=await c.queue(p);await c.setSettings({live_send_enabled:true});await c.uploadCV(new TextEncoder().encode('%PDF-1.4 changed'));await assert.rejects(c.reserve(q.id),/changed/);});
 test('duplicate company/contact blocked and cancelled unsent message can be rebuilt',async()=>{const {c}=await setup();const p=await packet(c),q=await c.queue(p);await assert.rejects(c.queue(p),/duplicate/);await c.cancel(q.id);assert.ok((await c.queue(p)).queued);});
@@ -97,7 +97,7 @@ const pdfFetch = bytes => async url => String(url).endsWith('/robots.txt')
  ? new Response('User-agent: *\nAllow: /') : new Response(bytes, {headers:{'content-type':'application/pdf'}});
 
 test('official PDF evidence supports inspection, queue and fresh reservation without changing CV',async()=>{
- const bytes=textPDF([['Sara Ahmed - Engineering Manager. Email: sara.ahmed@example.com','The new substation commissioning program has started.']]);
+ const bytes=textPDF([['Sara Ahmed - Engineering Manager. Email: sara.ahmed@example.com','The new substation commissioning program has started.','The relay testing phase includes supervised acceptance checks.']]);
  const f=pdfFetch(bytes), result=await inspectSource('https://example.com/contacts.pdf',f);
  assert.equal(result.source_format,'pdf');assert.equal(result.total_pages,1);assert.equal(result.source_sha256,await hash(bytes));
  assert.equal(result.contacts[0].email,'sara.ahmed@example.com');assert.equal(result.contacts[0].page,1);assert.equal(result.contacts[0].identity_verified,false);
@@ -112,7 +112,7 @@ test('PDF page boundaries cannot invent email ownership and changed PDF blocks r
  p.contact_role_quote='Sara Ahmed Engineering Manager';p.contact_email_quote='Sara Ahmed Engineering Manager sara.ahmed@example.com';
  const split=textPDF([['Sara Ahmed Engineering Manager'],['sara.ahmed@example.com','The new substation commissioning program has started']]);
  await assert.rejects(verifyEvidence(p,pdfFetch(split)),/email\/name/);
- c.fetcher=pdfFetch(textPDF([[p.contact_email_quote,p.company_fact.source_quote]]));
+ c.fetcher=pdfFetch(textPDF([[p.contact_email_quote,p.company_fact.source_quote,p.company_fact_secondary.source_quote]]));
  const q=await c.queue(p);await c.setSettings({live_send_enabled:true});c.fetcher=pdfFetch(split);
  await assert.rejects(c.reserve(q.id),/email\/name/);assert.equal(await c.quota(),0);
 });
@@ -173,4 +173,35 @@ test('Ireland and Saudi have independent atomic 25/day quotas (50 total), not a 
  assert.equal(state.quota_by_campaign['ksa-engineering'].remaining,0);
  assert.equal(state.quota_by_campaign['ireland-engineering'].remaining,0);
  assert.equal(state.quota_remaining,0);
+});
+
+test('25 confirmed Saudi sends with zero Ireland is partial despite legacy daily_target=25',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});
+ c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\\nAllow: /':html.replaceAll('example.com',new URL(url).hostname),{headers:{'content-type':String(url).endsWith('/robots.txt')?'text/plain':'text/html'}});
+ const {run_id}=await c.startRun('daily-25-plus-25');
+ for(let i=1;i<=25;i++){
+  const p=await packet(c,i);p.campaign='ksa-engineering';
+  const q=await c.queue(p,run_id),reserved=await c.reserve(q.id);
+  await c.receipt({reservation_token:reserved.reservation_token,message_id:i.toString(16).padStart(16,'0')});
+ }
+ const report=await c.finishRun(run_id,{discovered:25,researched:25,queued:25,sent:25,held:0,reasons:[]});
+ assert.equal(report.daily_sent,25);
+ assert.equal(report.daily_by_campaign['ksa-engineering'].sent,25);
+ assert.equal(report.daily_by_campaign['ireland-engineering'].sent,0);
+ assert.equal(report.daily_by_campaign['ireland-engineering'].available_reservations,25);
+ assert.equal(report.target_met,false);
+ assert.equal(report.status,'partial');
+});
+test('country-campaign owner subject cannot drift',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ assert.throws(()=>validatePacket({...p,subject:'Generic vacancy question'},profile,cv),/exact approved subject/);
+});
+
+test('second employer-specific statement is mandatory and must match original source',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ const missing={...p};delete missing.company_fact_secondary;
+ assert.throws(()=>validatePacket(missing,profile,cv));
+ const invented={...p,company_fact_secondary:{...p.company_fact_secondary,statement:'Invented secondary project detail',source_quote:'Invented secondary project detail'},body:p.body.replace('The relay testing phase includes supervised acceptance checks','Invented secondary project detail')};
+ await assert.rejects(c.queue(invented),/Secondary company fact source quote not found/);
+ assert.equal((await c.queue(p)).queued,true);
 });
