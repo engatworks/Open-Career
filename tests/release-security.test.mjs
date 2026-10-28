@@ -83,7 +83,7 @@ test('Source-level owner-private boundary blocks legacy API and MCP before acces
  assert.ok(api.indexOf('if(!legacyAllowed(env))')>0);
  assert.ok(api.indexOf('if(!legacyAllowed(env))')<api.indexOf('new Career(env)'));
  assert.ok(mcp.indexOf('if(!legacyAllowed(env))')>0);
- assert.ok(mcp.indexOf('if(!legacyAllowed(env))')<mcp.indexOf('request.json()'));
+ assert.ok(mcp.indexOf('if(!legacyAllowed(env))')<mcp.indexOf('JSON.parse('));
  assert.ok(homepage.includes("redirect('/join')"));
 });
 test('Public ATS search is authenticated and no longer uses the owner-private API route',()=>{

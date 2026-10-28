@@ -17,6 +17,7 @@ async function handler(request:Request){
   if(path==='contacts')return response(await career.contacts().search(Object.fromEntries(url.searchParams)));
   if(path==='contacts/stats')return response(await career.contacts().stats());
   if(path==='contacts/detail')return response(await career.contacts().detail(url.searchParams.get('email')));
+  if(path==='pipeline')return response(await career.pipeline().status());
   if(path==='status')return response(await career.status());
   if(path==='profile')return response(await career.profile()||{name:'',evidence:[]});
   if(path==='outreach')return response({items:await career.list()});
@@ -30,6 +31,12 @@ async function handler(request:Request){
  if(method==='POST'){
   if(path==='cv')return response(await career.uploadCV(await bounded(request,5000000)));
   const data=await json(request);
+  if(path==='pipeline/checkpoint')return response(await career.pipeline().checkpoint(data));
+  if(path==='pipeline/claim')return response(await career.pipeline().claim(data));
+  if(path==='pipeline/failure')return response(await career.pipeline().fail(data));
+  if(path==='pipeline/recover')return response(await career.pipeline().recover());
+  if(path==='pipeline/settings')return response(await career.pipeline().settings(data));
+  if(path==='history/reconcile')return response(await career.pipeline().importHistory(data));
   if(path==='companies/import')return response(await career.contacts().importCompanies(data));
   if(path==='contacts/import')return response(await career.contacts().import(data));
   if(path==='contacts/collect')return response(await career.contacts().collect(data));

@@ -135,3 +135,16 @@ export const tenantIdentities=sqliteTable('tenant_identities',{
  uniqueIndex('tenant_identities_external').on(t.issuer,t.subject),
  index('tenant_identities_owner').on(t.tenant_id),
 ]);
+
+export const employerAliases=sqliteTable('employer_aliases',{
+ alias_domain:text('alias_domain').primaryKey(),canonical_domain:text('canonical_domain').notNull(),source_url:text('source_url').notNull(),source_quote:text('source_quote').notNull(),verified_at:text('verified_at').notNull(),
+},t=>[index('employer_aliases_canonical').on(t.canonical_domain)]);
+export const employerPipeline=sqliteTable('employer_pipeline',{
+ canonical_domain:text('canonical_domain').primaryKey(),company:text('company').notNull(),campaign:text('campaign').notNull(),stage:text('stage').notNull(),outreach_id:text('outreach_id'),research:text('research').notNull().default('{}'),evidence:text('evidence').notNull().default('{}'),verified_at:text('verified_at'),updated_at:text('updated_at').notNull(),next_action:text('next_action').notNull().default('research'),attempts:integer('attempts').notNull().default(0),next_attempt_at:text('next_attempt_at'),lease_token:text('lease_token'),lease_until:text('lease_until'),last_error:text('last_error'),error_class:text('error_class'),
+},t=>[index('pipeline_work').on(t.campaign,t.stage,t.next_attempt_at)]);
+export const providerReceipts=sqliteTable('provider_receipts',{
+ message_id:text('message_id').primaryKey(),outreach_id:text('outreach_id').notNull().unique(),thread_id:text('thread_id'),recorded_at:text('recorded_at').notNull(),
+});
+export const historicalReceipts=sqliteTable('historical_receipts',{
+ message_id:text('message_id').primaryKey(),thread_id:text('thread_id'),company_domain:text('company_domain').notNull(),company:text('company').notNull(),email:text('email').notNull(),sent_at:text('sent_at').notNull(),subject:text('subject').notNull(),status:text('status').notNull(),campaign:text('campaign'),cv_sha256:text('cv_sha256'),imported_at:text('imported_at').notNull(),
+},t=>[index('historical_employer').on(t.company_domain)]);

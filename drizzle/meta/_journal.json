@@ -71,6 +71,13 @@
       "when": 1792604400000,
       "tag": "0009_stable_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793229463320,
+      "tag": "0010_durable_pipeline",
+      "breakpoints": true
     }
   ]
 }

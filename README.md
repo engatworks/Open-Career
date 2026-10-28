@@ -1,4 +1,4 @@
-# Open Career — cloud edition 0.5.1
+# Open Career — cloud edition 0.6.0
 
 Your private career workspace, driven by ChatGPT cloud research and your connected Gmail. The core workflow does not require an always-on laptop, Ollama, a separate inference API key, or exporting your Gmail authorization.
 
@@ -117,3 +117,7 @@ Before commercial registrations or customer billing: validate OIDC, actual Cloud
 A new immutable signed-OIDC **issuer + subject → tenant ID** registry prevents already-linked accounts from changing identity when the tenant-HMAC derivation secret is rotated. Deployment requires additive `0009_stable_identities`, successful linking of *all existing active users while retaining the old derivation secret*, and a read-only mapping-coverage check before rotation. Unmapped legacy accounts require identity-verified operator reconciliation; email equality **never** automatically transfers one account to another.
 
 See [stable identity rotation procedures](docs/STABLE_IDENTITY_ROTATION.md). No live derivation-key rotation or existing-account migration has been executed.
+
+## Durable owner-private recovery
+
+Version 0.6 adds resumable employer research, historical Gmail deduplication, bounded source reads, official recruitment-inbox evidence tiers, documented corporate aliases, interruption quarantine and bounce-excluded delivery reporting. See [production boundaries](docs/PRODUCTION_0_6.md). The public repository retains its tenant-isolated API and release guards; this owner-private pipeline is not exposed to additional tenants. Existing tenant migrations are preserved; the new additive pipeline migration follows them. Updating this source mirror does not publish the private production Site.
