@@ -9,3 +9,7 @@ The owner recovery operation `/api/reservation/release-unissued` requires a fres
 Schedule status distinguishes enabled from paused metadata. The existing daily cloud task must be synchronized with the live research contract: one sufficient official page can establish an explicit CV invitation; named-person messages still require identity research and two distinct original pages. A sufficient recruitment invitation does not require an unsuccessful named-person search.
 
 The Site remains owner-private, preserves the same database/CV storage and has no independent Gmail authorization or hosting cron. Its existing ChatGPT daily task supplies execution. A schedule registration is not evidence of future delivery or a guarantee of 50 qualified employers daily.
+
+## 0.6.3 discovery follow-up
+
+The uncontacted discovery filter now excludes independently reconciled Gmail history and canonical corporate-domain aliases. It also exposes historical_contacted on discovery results. A regression verifies that a different recipient at an already-contacted alias is not surfaced as a new employer. Live history reconciliation includes older career subjects, not only the current fixed subject.

@@ -403,3 +403,12 @@ test('stale-reservation recovery counts outreach rows once despite pipeline trig
  assert.equal((await c.pipeline().recover()).quarantined,1);assert.equal((await c.pipeline().recover()).quarantined,0);
  assert.equal((await c.list())[0].reservation_token,r.reservation_token);
 });
+
+
+test('uncontacted discovery excludes reconciled employer history through corporate aliases',async()=>{
+ const {c}=await setup();await c.contacts().import({provider:'Published fixture',records:[{email:'careers@alias.com',source_url:'https://canonical.com/careers'}]});
+ await c.stmt('INSERT INTO employer_aliases(alias_domain,canonical_domain,source_url,source_quote,verified_at) VALUES(?,?,?,?,?)','alias.com','canonical.com','https://canonical.com/careers','Send your CV to careers@alias.com',new Date().toISOString()).run();
+ assert.equal((await c.contacts().search({kind:'uncontacted'})).total,1);
+ await c.pipeline().importHistory({records:[{company:'Canonical Employer',company_domain:'canonical.com',email:'other@canonical.com',message_id:'1000000000000001',sent_at:new Date().toISOString(),subject:'Previous application'}]});
+ assert.equal((await c.contacts().search({kind:'uncontacted'})).total,0);assert.equal((await c.contacts().search()).items[0].historical_contacted,1);
+});
