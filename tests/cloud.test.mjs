@@ -412,3 +412,12 @@ test('uncontacted discovery excludes reconciled employer history through corpora
  await c.pipeline().importHistory({records:[{company:'Canonical Employer',company_domain:'canonical.com',email:'other@canonical.com',message_id:'1000000000000001',sent_at:new Date().toISOString(),subject:'Previous application'}]});
  assert.equal((await c.contacts().search({kind:'uncontacted'})).total,0);assert.equal((await c.contacts().search()).items[0].historical_contacted,1);
 });
+
+
+test('official plural CVs invitation qualifies without allowing ordinary sales contact',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ Object.assign(p,{contact_type:'recruitment_team',contact_name:'Recruitment Team',contact_role:'Recruitment',email:'careers@example.com',email_source_url:'https://example.com/careers',contact_role_source:'https://example.com/careers',contact_role_quote:'Join our engineering team',contact_email_quote:'Send your CVs to careers@example.com',body:p.body.replace('Dear Sara','Dear Recruitment Team')});
+ c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>Join our engineering team</p><p>Send your CVs to careers@example.com</p>',{headers:{'content-type':'text/html'}});
+ assert.equal((await c.queue(p)).queued,true);await c.setSettings({live_send_enabled:true});assert.ok((await c.reserve((await c.list())[0].id)).payload);
+ assert.throws(()=>validatePacket({...p,contact_email_quote:'Sales contact careers@example.com'},profile,cv),/invitation/);
+});

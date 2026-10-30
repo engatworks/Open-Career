@@ -13,3 +13,7 @@ The Site remains owner-private, preserves the same database/CV storage and has n
 ## 0.6.3 discovery follow-up
 
 The uncontacted discovery filter now excludes independently reconciled Gmail history and canonical corporate-domain aliases. It also exposes historical_contacted on discovery results. A regression verifies that a different recipient at an already-contacted alias is not surfaced as a new employer. Live history reconciliation includes older career subjects, not only the current fixed subject.
+
+## 0.6.4 recruitment wording
+
+Explicit published invitations written as “send your CVs” now pass the same evidence gate as “send your CV.” Exact address/source binding and manual relevance checks remain mandatory; ordinary sales contacts still fail. A queue-to-reservation regression covers plural wording.
