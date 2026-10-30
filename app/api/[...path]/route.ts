@@ -46,6 +46,7 @@ async function handler(request:Request){
   if(path==='research-plan')return response(career.researchPlan(data.domain));
   if(path==='queue')return response(await career.queue(data.packet||data,data.run_id||null));
   if(path==='leads')return response(await career.recordLead(data));
+  if(path==='reservation/release-unissued')return response(await career.releaseUnissuedReservation(data));
   if(path==='reserve')return response(await career.reserve(data.id));
   if(path==='receipt')return response(await career.receipt(data));
   if(path==='uncertain')return response(await career.uncertain(data.reservation_token,data.reason));

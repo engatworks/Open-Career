@@ -7,7 +7,7 @@ import { extractPublicSource } from '../lib/public-source.mjs';
 
 class D1 {
  constructor(){this.db=new DatabaseSync(':memory:');for(const file of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())this.db.exec(fs.readFileSync('drizzle/'+file,'utf8').replaceAll('--> statement-breakpoint',''));}
- prepare(sql){const db=this.db;let values=[];const api={bind(...a){values=a;return api;},async first(){return db.prepare(sql).get(...values)||null;},async all(){return {results:db.prepare(sql).all(...values)};},run(){return {meta:{changes:Number(db.prepare(sql).run(...values).changes)}};}};return api;}
+ prepare(sql){const db=this.db;let values=[];const api={bind(...a){values=a;return api;},async first(){return db.prepare(sql).get(...values)||null;},async all(){return {results:db.prepare(sql).all(...values)};},run(){const before=db.prepare('SELECT total_changes() n').get().n;const stmt=db.prepare(sql);const results=stmt.columns().length?stmt.all(...values):(stmt.run(...values),[]);return {results,meta:{changes:Number(db.prepare('SELECT total_changes() n').get().n-before)}};}};return api;}
  async batch(statements){this.db.exec('BEGIN');try{const results=statements.map(s=>s.run());this.db.exec('COMMIT');return results;}catch(e){this.db.exec('ROLLBACK');throw e;}}
 }
 class Bucket{constructor(){this.values=new Map();}async put(key,bytes){this.values.set(key,new Uint8Array(bytes));}async get(key){const data=this.values.get(key);return data?{arrayBuffer:async()=>data.slice().buffer}:null;}}
@@ -356,4 +356,50 @@ test('bounded source reads respect per-origin politeness and settle independent 
  const urls=['https://one.example/a','https://one.example/b','https://two.example/a','https://three.example/a','https://three.example/b'];
  const result=await mapBounded(urls,3,async url=>{const origin=new URL(url).origin;assert.equal(perOrigin.get(origin)||0,0);perOrigin.set(origin,1);active++;peak=Math.max(peak,active);try{await new Promise(resolve=>setTimeout(resolve,5));if(origin==='https://two.example')throw Error('Independent fetch failed');return url;}finally{active--;perOrigin.set(origin,0);}},url=>new URL(url).origin);
  assert.equal(peak,3);assert.equal(result.filter(r=>r.status==='fulfilled').length,4);assert.equal(result[2].status,'rejected');assert.equal(result[1].value,urls[1]);assert.equal(active,0);
+});
+
+// D1 reports total_changes(), including writes performed by pipeline triggers.
+// Keep the adapter above faithful so this cannot regress behind SQLite changes().
+test('D1 trigger writes count twice but reservation returns the one guarded outreach row',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c));
+ const change=await c.stmt("UPDATE outreach SET status='queued' WHERE id=?",q.id).run();assert.equal(change.meta.changes,2);
+ const r=await c.reserve(q.id);assert.ok(r.payload.parts[1].body.base64_url_content);
+ assert.equal((await c.stmt('SELECT stage FROM employer_pipeline WHERE outreach_id=?',q.id).first()).stage,'SEND');
+ await c.uncertain(r.reservation_token,'Timeout after Gmail request');
+ await assert.rejects(c.reserve(q.id),/processed|unknown/);assert.equal(await c.quota(),1);
+});
+async function unissued(c,number=0){
+ const q=await c.queue(await packet(c,number)),token=crypto.randomUUID();
+ await c.stmt("UPDATE outreach SET status='needs_reconciliation',reservation_token=?,reserved_at=?,last_error=? WHERE id=?",token,new Date().toISOString(),'prepare_delivery returned INVALID_ARGUMENT without a usable Gmail payload. No Gmail send was attempted.',q.id).run();
+ const d=number?'company'+number+'.com':'example.com';
+ return {q,token,proof:{id:q.id,gmail_checked_at:new Date().toISOString(),gmail_query:'in:sent {to:sara.ahmed@'+d+' to:'+d+'}',gmail_sent_match_count:0}};
+}
+test('unissued payload recovery releases only proven unused quota and requires fresh research',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});const {q,proof}=await unissued(c);
+ assert.equal(await c.quota(),1);assert.equal((await c.releaseUnissuedReservation(proof)).fresh_research_required,true);
+ assert.equal(await c.quota(),0);assert.equal((await c.list())[0].status,'cancelled');
+ const state=await c.stmt('SELECT * FROM employer_pipeline WHERE canonical_domain=?','example.com').first();assert.equal(state.stage,'VERIFY');assert.equal(state.outreach_id,null);
+ assert.equal((await c.releaseUnissuedReservation(proof)).already_released,true);
+ await assert.rejects(c.reserve(q.id),/processed/);assert.equal((await c.queue(await packet(c))).queued,true);
+});
+test('issued payloads and actual ambiguous Gmail sends never qualify for release',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);
+ await c.uncertain(r.reservation_token,'No Gmail send was attempted; prepare payload was lost after return');
+ const proof={id:q.id,gmail_checked_at:new Date().toISOString(),gmail_query:'in:sent {to:sara.ahmed@example.com to:example.com}',gmail_sent_match_count:0};
+ await assert.rejects(c.releaseUnissuedReservation(proof),/Payload issuance/);assert.equal(await c.quota(),1);
+ const {c:otherCareer}=await setup();const other=await unissued(otherCareer);await otherCareer.stmt('UPDATE outreach SET last_error=? WHERE id=?','Gmail send failed HTTP 403',other.q.id).run();
+ await assert.rejects(otherCareer.releaseUnissuedReservation(other.proof),/ambiguous delivery/);
+});
+test('release rejects stale or unrelated Gmail checks and reconciled provider evidence',async()=>{
+ const {c}=await setup();const {q,proof}=await unissued(c);
+ await assert.rejects(c.releaseUnissuedReservation({...proof,gmail_checked_at:new Date(Date.now()-360000).toISOString()}),/Fresh Gmail/);
+ await assert.rejects(c.releaseUnissuedReservation({...proof,gmail_query:'in:sent to:unrelated.com'}),/cover recipient/);
+ await c.pipeline().importHistory({records:[{company:'Example Power',company_domain:'example.com',email:'other@example.com',message_id:'1000000000000001',sent_at:new Date().toISOString(),subject:'Earlier contact'}]});
+ await assert.rejects(c.releaseUnissuedReservation(proof),/provider evidence/);assert.equal((await c.list()).find(x=>x.id===q.id).status,'needs_reconciliation');
+});
+test('stale-reservation recovery counts outreach rows once despite pipeline trigger writes',async()=>{
+ const {c}=await setup();await c.setSettings({live_send_enabled:true});const q=await c.queue(await packet(c)),r=await c.reserve(q.id);
+ await c.stmt('UPDATE outreach SET reserved_at=? WHERE id=?',new Date(Date.now()-20*60000).toISOString(),q.id).run();
+ assert.equal((await c.pipeline().recover()).quarantined,1);assert.equal((await c.pipeline().recover()).quarantined,0);
+ assert.equal((await c.list())[0].reservation_token,r.reservation_token);
 });
