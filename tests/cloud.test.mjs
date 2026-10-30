@@ -421,3 +421,12 @@ test('official plural CVs invitation qualifies without allowing ordinary sales c
  assert.equal((await c.queue(p)).queued,true);await c.setSettings({live_send_enabled:true});assert.ok((await c.reserve((await c.list())[0].id)).payload);
  assert.throws(()=>validatePacket({...p,contact_email_quote:'Sales contact careers@example.com'},profile,cv),/invitation/);
 });
+
+test('official talent email invitations qualify while talent and sales mentions alone do not',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ const quote='We are always on the look out for great talent. If you want to be part of our team, drop an email to careers@example.com and we will review your profile.';
+ Object.assign(p,{contact_type:'recruitment_team',contact_name:'Recruitment Team',contact_role:'Recruitment',email:'careers@example.com',email_source_url:'https://example.com/careers',contact_role_source:'https://example.com/careers',contact_role_quote:'Join our engineering team',contact_email_quote:quote,body:p.body.replace('Dear Sara','Dear Recruitment Team')});
+ c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>Join our engineering team</p><p>'+quote+'</p>',{headers:{'content-type':'text/html'}});
+ assert.equal((await c.queue(p)).queued,true);await c.setSettings({live_send_enabled:true});assert.ok((await c.reserve((await c.list())[0].id)).payload);
+ for(const q of ['Sales contact careers@example.com','Our team has great talent. Contact careers@example.com','Drop an email to careers@example.com about our products.'])assert.throws(()=>validatePacket({...p,contact_email_quote:q},profile,cv),/invitation/);
+});

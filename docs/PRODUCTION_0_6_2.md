@@ -17,3 +17,7 @@ The uncontacted discovery filter now excludes independently reconciled Gmail his
 ## 0.6.4 recruitment wording
 
 Explicit published invitations written as “send your CVs” now pass the same evidence gate as “send your CV.” Exact address/source binding and manual relevance checks remain mandatory; ordinary sales contacts still fail. A queue-to-reservation regression covers plural wording.
+
+## 0.6.5 explicit talent invitations
+
+Official careers pages that explicitly seek talent and invite an email now pass the wording gate even when the invitation uses neither CV nor application. The combination of talent recruitment and a direct email invitation is required; sales contact, talent mentions alone, and an email request without recruiting context remain rejected. Queue-to-reservation regression coverage preserves original-source re-fetch, exact recipient evidence, dedupe, suppression, country caps and frozen CV checks.
