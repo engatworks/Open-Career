@@ -430,3 +430,24 @@ test('official talent email invitations qualify while talent and sales mentions 
  assert.equal((await c.queue(p)).queued,true);await c.setSettings({live_send_enabled:true});assert.ok((await c.reserve((await c.list())[0].id)).payload);
  for(const q of ['Sales contact careers@example.com','Our team has great talent. Contact careers@example.com','Drop an email to careers@example.com about our products.'])assert.throws(()=>validatePacket({...p,contact_email_quote:q},profile,cv),/invitation/);
 });
+
+test('full published named contact cards may exceed 500 characters without invented ownership',async()=>{
+ const {c}=await setup(),p=await packet(c);
+ p.contact_email_quote=p.contact_name+' '+p.contact_role+' '+('Engineering background and supervised team leadership. '.repeat(15))+p.email;
+ c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>'+p.contact_email_quote+'</p>',{headers:{'content-type':'text/html'}});
+ assert.ok(p.contact_email_quote.length>500);
+ assert.equal((await c.queue(p)).queued,true);
+ await c.setSettings({live_send_enabled:true});assert.ok((await c.reserve((await c.list())[0].id)).payload);
+ await assert.rejects(verifyEvidence({...p,contact_email_quote:p.contact_email_quote.replace('sara@example.com','other@example.com'),email:'other@example.com'},c.fetcher),/quote/);
+});
+test('talent-network and dotted CV invitations qualify with the short recruitment quote limit retained',async()=>{
+ const {c}=await setup(),p=await packet(c),cv=await c.config('cv');
+ Object.assign(p,{contact_type:'recruitment_team',contact_name:'Recruitment Team',contact_role:'Recruitment',email:'careers@example.com',email_source_url:'https://example.com/careers',contact_role_source:'https://example.com/careers',contact_role_quote:'Join our engineering team',body:p.body.replace('Dear Sara','Dear Recruitment Team')});
+ for(const quote of ['Join Our Talent Network careers@example.com','Send your C.V. to careers@example.com']){
+  p.contact_email_quote=quote;assert.ok(validatePacket(p,profile,cv));
+  c.fetcher=async url=>new Response(String(url).endsWith('/robots.txt')?'User-agent: *\nAllow: /':html+'<p>Join our engineering team</p><p>'+quote+'</p>',{headers:{'content-type':'text/html'}});
+  await verifyEvidence(p,c.fetcher);
+ }
+ assert.throws(()=>validatePacket({...p,contact_email_quote:'Join Our Talent Network '+('a'.repeat(501))+' careers@example.com'},profile,cv),/500/);
+ assert.throws(()=>validatePacket({...p,contact_email_quote:'Our talent network sells products. Contact careers@example.com'},profile,cv),/invitation/);
+});

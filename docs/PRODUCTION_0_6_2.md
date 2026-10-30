@@ -21,3 +21,7 @@ Explicit published invitations written as “send your CVs” now pass the same 
 ## 0.6.5 explicit talent invitations
 
 Official careers pages that explicitly seek talent and invite an email now pass the wording gate even when the invitation uses neither CV nor application. The combination of talent recruitment and a direct email invitation is required; sales contact, talent mentions alone, and an email request without recruiting context remain rejected. Queue-to-reservation regression coverage preserves original-source re-fetch, exact recipient evidence, dedupe, suppression, country caps and frozen CV checks.
+
+## 0.6.6 published contact-card evidence
+
+Named-person email quotations may contain up to 2,000 characters so a complete published biography/contact card can bind the full name to its mailbox. Original-source matching, current-role research and two original pages are still required; an invented mailbox fails re-fetch. Recruitment invitations retain the 500-character bound and now recognize dotted C.V. and explicit invitations to join a talent network. Regression tests cover both valid forms and rejected sales/general-contact wording.
